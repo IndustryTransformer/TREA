@@ -706,7 +706,9 @@ class MultiDatasetModel(pl.LightningModule):
         channels_to_cat = [x_val, m_nan]
 
         if self.use_feature_masks:
-            numeric_feature_mask = feature_mask_padded[:, : self.max_numeric_features, :]
+            numeric_feature_mask = feature_mask_padded[
+                :, : self.max_numeric_features, :
+            ]
             channels_to_cat.append(numeric_feature_mask)
 
         if self.use_column_embeddings and self.column_embedder is not None:
@@ -721,7 +723,9 @@ class MultiDatasetModel(pl.LightningModule):
         channels_to_cat.append(x_cat_reshaped)
 
         if self.use_feature_masks:
-            categorical_feature_mask = feature_mask_padded[:, self.max_numeric_features :, :]
+            categorical_feature_mask = feature_mask_padded[
+                :, self.max_numeric_features :, :
+            ]
             channels_to_cat.append(categorical_feature_mask)
 
         if self.use_column_embeddings and self.column_embedder is not None:
@@ -760,7 +764,9 @@ class MultiDatasetModel(pl.LightningModule):
         mask = torch.triu(mask, diagonal=1)
         return mask
 
-    def _encode_patches(self, patches: torch.Tensor, causal: bool = False) -> torch.Tensor:
+    def _encode_patches(
+        self, patches: torch.Tensor, causal: bool = False
+    ) -> torch.Tensor:
         """Encode patch sequence with optional causal attention mask."""
         B, num_patches, _ = patches.shape
 
@@ -775,7 +781,11 @@ class MultiDatasetModel(pl.LightningModule):
         return self.transformer(patch_embeddings)
 
     def _pad_categorical_indices_to_unified_space(
-        self, x_cat: torch.Tensor | None, batch_size: int, seq_len: int, device: torch.device
+        self,
+        x_cat: torch.Tensor | None,
+        batch_size: int,
+        seq_len: int,
+        device: torch.device,
     ) -> torch.Tensor:
         """Pad categorical indices to model's max categorical feature space."""
         x_cat_padded = torch.full(
@@ -915,12 +925,16 @@ class MultiDatasetModel(pl.LightningModule):
                         x_cat=x_cat, batch_size=B, seq_len=T, device=x_num.device
                     )
 
-                    numeric_predictions = self.ssl_heads["causal_numeric"](current_states)
+                    numeric_predictions = self.ssl_heads["causal_numeric"](
+                        current_states
+                    )
                     numeric_targets = (
                         x_num_padded[:, :, target_steps].permute(0, 2, 1).contiguous()
                     )  # [B, V, max_numeric]
                     numeric_present = (
-                        feature_mask_padded[:, : self.max_numeric_features, target_steps]
+                        feature_mask_padded[
+                            :, : self.max_numeric_features, target_steps
+                        ]
                         .permute(0, 2, 1)
                         .contiguous()
                         > 0
@@ -938,7 +952,9 @@ class MultiDatasetModel(pl.LightningModule):
                         and "causal_categorical" in self.ssl_heads
                     ):
                         categorical_targets = (
-                            x_cat_padded[:, :, target_steps].permute(0, 2, 1).contiguous()
+                            x_cat_padded[:, :, target_steps]
+                            .permute(0, 2, 1)
+                            .contiguous()
                         )  # [B, V, max_categorical]
                         categorical_present = (
                             feature_mask_padded[

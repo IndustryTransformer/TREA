@@ -11,6 +11,7 @@ Usage:
 import argparse
 import sys
 
+
 sys.path.insert(0, ".")
 
 import pytorch_lightning as pl
@@ -91,7 +92,9 @@ class ToyVariableDataset(Dataset):
                 additive = 0.18 * (base_channels[j] - 0.6 * lag_j)
                 x_num[:, i, :] = x_num[:, i, :] + interaction + additive
 
-        nan_mask = torch.rand(num_samples, n_numeric, seq_len, generator=gen) < missing_ratio
+        nan_mask = (
+            torch.rand(num_samples, n_numeric, seq_len, generator=gen) < missing_ratio
+        )
         x_num[nan_mask] = float("nan")
         self.x_num = x_num
 
@@ -102,11 +105,13 @@ class ToyVariableDataset(Dataset):
                 ref_b = x_num[:, (i + 2) % n_numeric, :]
                 ref_a = torch.nan_to_num(ref_a, nan=0.0)
                 ref_b = torch.nan_to_num(ref_b, nan=0.0)
-                cat_signal = 0.5 * z + 0.4 * z2 + 0.35 * seasonal + 0.25 * torch.roll(
-                    ref_a * ref_b, shifts=(i % 5) + 1, dims=1
-                ) + torch.randn(
-                    num_samples, seq_len, generator=gen
-                ) * 0.05
+                cat_signal = (
+                    0.5 * z
+                    + 0.4 * z2
+                    + 0.35 * seasonal
+                    + 0.25 * torch.roll(ref_a * ref_b, shifts=(i % 5) + 1, dims=1)
+                    + torch.randn(num_samples, seq_len, generator=gen) * 0.05
+                )
                 cat_signal = (cat_signal - cat_signal.mean(dim=1, keepdim=True)) / (
                     cat_signal.std(dim=1, keepdim=True) + 1e-6
                 )

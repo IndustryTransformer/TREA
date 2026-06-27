@@ -629,8 +629,7 @@ def noninferiority_analysis(
 
     candidate_runs = [r for r in runs if r["model"] == candidate_model]
     by_candidate_seed = {
-        int(r["seed"]): float(r["val_f1_macro"])
-        for r in candidate_runs
+        int(r["seed"]): float(r["val_f1_macro"]) for r in candidate_runs
     }
 
     overall_pass = True

@@ -294,8 +294,7 @@ def build_report(
         lines.append("## Non-Inferiority Summary")
         lines.append("")
         lines.append(
-            "| Comparator | Δ mean (candidate - comparator) | "
-            "Δ CI95 | Non-inferior |"
+            "| Comparator | Δ mean (candidate - comparator) | Δ CI95 | Non-inferior |"
         )
         lines.append("|---|---:|---:|---:|")
         for row in noninf_rows:

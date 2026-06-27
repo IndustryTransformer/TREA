@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import argparse
 import sys
+
 from pathlib import Path
 from typing import Any
+
 
 sys.path.insert(0, ".")
 
@@ -245,7 +247,9 @@ def train_and_eval(
     args: argparse.Namespace,
     num_classes: int,
 ) -> dict[str, Any]:
-    logger = TensorBoardLogger(save_dir=args.log_dir, name="3w_compare", version=run_name)
+    logger = TensorBoardLogger(
+        save_dir=args.log_dir, name="3w_compare", version=run_name
+    )
     ckpt_cb = ModelCheckpoint(
         dirpath=Path(args.ckpt_dir) / run_name,
         filename="epoch-{epoch:02d}",

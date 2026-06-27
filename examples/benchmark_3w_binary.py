@@ -19,6 +19,7 @@ import datetime as dt
 import json
 import sys
 import time
+
 from pathlib import Path
 from types import MethodType
 from typing import Any
@@ -27,15 +28,18 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+
 from pytorch_lightning.callbacks import EarlyStopping
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import LocalOutlierFactor
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
+
 sys.path.insert(0, ".")
 
 from trea.models import TriplePatchTransformer
 from utils.three_w import ThreeWDataset
+
 
 DEEP_MODELS = {
     "trea_triple",
@@ -59,7 +63,9 @@ def remap_to_binary(dataset: ThreeWDataset) -> None:
     for cls, count in zip(unique, counts, strict=False):
         dataset.class_weights[cls] = total / (count * 2)
 
-    print(f"  Binary remap: Normal={dataset.class_counts[0]}, Anomaly={dataset.class_counts[1]}")
+    print(
+        f"  Binary remap: Normal={dataset.class_counts[0]}, Anomaly={dataset.class_counts[1]}"
+    )
 
 
 class BinaryThreeWDataModule(pl.LightningDataModule):
@@ -223,9 +229,7 @@ def extract_engineered_features(windows: np.ndarray) -> np.ndarray:
     return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
 
-def binary_metrics(
-    preds: np.ndarray, targets: np.ndarray
-) -> dict[str, float]:
+def binary_metrics(preds: np.ndarray, targets: np.ndarray) -> dict[str, float]:
     """Compute binary classification metrics (anomaly = positive class)."""
     tp = int(((preds == 1) & (targets == 1)).sum())
     fp = int(((preds == 1) & (targets == 0)).sum())
@@ -354,9 +358,7 @@ def run_deep_model(
 
     model.validation_step = validation_step_binary
 
-    early_stop = EarlyStopping(
-        monitor="val_loss", patience=5, mode="min", verbose=True
-    )
+    early_stop = EarlyStopping(monitor="val_loss", patience=5, mode="min", verbose=True)
 
     trainer = pl.Trainer(
         max_epochs=args.max_epochs,
@@ -499,7 +501,9 @@ def build_report(
         "| Model | Seeds | Anomaly F1 | Normal F1 | Macro F1 | "
         "Accuracy | Precision | Recall | Sec/run |"
     )
-    lines.append("|-------|------:|----------:|---------:|--------:|--------:|----------:|-------:|--------:|")
+    lines.append(
+        "|-------|------:|----------:|---------:|--------:|--------:|----------:|-------:|--------:|"
+    )
 
     for model_name in models:
         model_runs = [r for r in runs if r["model"] == model_name]
@@ -523,8 +527,12 @@ def build_report(
     lines.append("")
     lines.append("## Per-Run Detail")
     lines.append("")
-    lines.append("| Model | Seed | Anomaly F1 | Normal F1 | Macro F1 | Accuracy | TP | FP | FN | TN |")
-    lines.append("|-------|-----:|----------:|---------:|--------:|--------:|---:|---:|---:|---:|")
+    lines.append(
+        "| Model | Seed | Anomaly F1 | Normal F1 | Macro F1 | Accuracy | TP | FP | FN | TN |"
+    )
+    lines.append(
+        "|-------|-----:|----------:|---------:|--------:|--------:|---:|---:|---:|---:|"
+    )
 
     for r in runs:
         lines.append(
@@ -648,7 +656,7 @@ def main() -> None:
     )
 
     for model_name in models:
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"Model: {model_name}")
         print("=" * 70)
 
@@ -694,9 +702,20 @@ def main() -> None:
 
     # Save results
     fieldnames = [
-        "model", "seed", "anomaly_f1", "normal_f1", "macro_f1", "accuracy",
-        "anomaly_precision", "anomaly_recall", "tp", "fp", "fn", "tn",
-        "train_seconds", "num_params",
+        "model",
+        "seed",
+        "anomaly_f1",
+        "normal_f1",
+        "macro_f1",
+        "accuracy",
+        "anomaly_precision",
+        "anomaly_recall",
+        "tp",
+        "fp",
+        "fn",
+        "tn",
+        "train_seconds",
+        "num_params",
     ]
     write_csv(out_dir / "runs.csv", runs, fieldnames)
 

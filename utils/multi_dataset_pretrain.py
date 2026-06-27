@@ -39,7 +39,7 @@ class DatasetSource:
         n_categorical: int | None = None,
         cat_cardinalities: list[int] | None = None,
         column_names: list[str] | None = None,
-    ) -> "DatasetSource":
+    ) -> DatasetSource:
         """Build source metadata from dataset introspection + optional overrides."""
         info = {}
         if hasattr(dataset, "get_feature_info"):
@@ -51,17 +51,25 @@ class DatasetSource:
         sample_x_cat = sample.get("x_cat", None)
 
         inferred_n_numeric = int(sample_x_num.shape[0])
-        inferred_n_categorical = int(sample_x_cat.shape[0]) if sample_x_cat is not None else 0
+        inferred_n_categorical = (
+            int(sample_x_cat.shape[0]) if sample_x_cat is not None else 0
+        )
         inferred_num_classes = int(
             info.get("num_classes", getattr(dataset, "num_classes", 2))
         )
-        inferred_cat_cardinalities = info.get("cat_cardinalities", [100] * inferred_n_categorical)
+        inferred_cat_cardinalities = info.get(
+            "cat_cardinalities", [100] * inferred_n_categorical
+        )
         inferred_column_names = info.get("column_names", None)
 
         return cls(
             name=name,
             dataset=dataset,
-            n_numeric=int(n_numeric if n_numeric is not None else info.get("n_numeric", inferred_n_numeric)),
+            n_numeric=int(
+                n_numeric
+                if n_numeric is not None
+                else info.get("n_numeric", inferred_n_numeric)
+            ),
             n_categorical=int(
                 n_categorical
                 if n_categorical is not None
@@ -70,8 +78,12 @@ class DatasetSource:
             cat_cardinalities=cat_cardinalities
             if cat_cardinalities is not None
             else inferred_cat_cardinalities,
-            num_classes=int(num_classes if num_classes is not None else inferred_num_classes),
-            column_names=column_names if column_names is not None else inferred_column_names,
+            num_classes=int(
+                num_classes if num_classes is not None else inferred_num_classes
+            ),
+            column_names=column_names
+            if column_names is not None
+            else inferred_column_names,
         )
 
 
@@ -104,7 +116,9 @@ class _DatasetAdapter(Dataset):
         }
 
 
-def _resize_time_axis(x: torch.Tensor, target_len: int, pad_value: float | int) -> torch.Tensor:
+def _resize_time_axis(
+    x: torch.Tensor, target_len: int, pad_value: float | int
+) -> torch.Tensor:
     """Pad or truncate tensor on time axis to target length.
 
     Expects x shaped [C, T].
@@ -160,19 +174,24 @@ class MultiDatasetPretrainCollator:
         num_classes = torch.zeros((bsz,), dtype=torch.long)
 
         for i, sample in enumerate(batch):
-            sample_x_num = _resize_time_axis(sample["x_num"].float(), target_t, float("nan"))
+            sample_x_num = _resize_time_axis(
+                sample["x_num"].float(), target_t, float("nan")
+            )
             sample_n_num = min(int(sample["n_numeric"]), self.max_numeric_features)
             x_num[i, :sample_n_num, :] = sample_x_num[:sample_n_num, :]
             feature_mask[i, :sample_n_num, :] = 1.0
 
             sample_x_cat = sample.get("x_cat", None)
-            sample_n_cat = min(int(sample["n_categorical"]), self.max_categorical_features)
+            sample_n_cat = min(
+                int(sample["n_categorical"]), self.max_categorical_features
+            )
             if sample_x_cat is not None and sample_n_cat > 0:
                 sample_x_cat = _resize_time_axis(sample_x_cat.long(), target_t, 0)
                 x_cat[i, :sample_n_cat, :] = sample_x_cat[:sample_n_cat, :]
                 feature_mask[
                     i,
-                    self.max_numeric_features : self.max_numeric_features + sample_n_cat,
+                    self.max_numeric_features : self.max_numeric_features
+                    + sample_n_cat,
                     :,
                 ] = 1.0
 
@@ -220,8 +239,8 @@ class MultiDatasetPretrainDataModule(pl.LightningDataModule):
         self.max_categorical_features = max(
             source.n_categorical for source in train_sources
         )
-        self.max_categorical_cardinalities = self._compute_max_categorical_cardinalities(
-            train_sources
+        self.max_categorical_cardinalities = (
+            self._compute_max_categorical_cardinalities(train_sources)
         )
 
         self.collate_fn = MultiDatasetPretrainCollator(

@@ -264,11 +264,12 @@ class W3DataModule(pl.LightningDataModule):
             n_train = total_windows - n_val
 
             print(f"\nSplitting {total_windows:,} windows into:")
-            print(f"  Train: {n_train:,} ({(1-self.val_split)*100:.0f}%)")
-            print(f"  Val: {n_val:,} ({self.val_split*100:.0f}%)")
+            print(f"  Train: {n_train:,} ({(1 - self.val_split) * 100:.0f}%)")
+            print(f"  Val: {n_val:,} ({self.val_split * 100:.0f}%)")
 
             # Use PyTorch's random_split for reproducible split
             from torch.utils.data import random_split
+
             generator = torch.Generator().manual_seed(42)
             self.train_dataset, self.val_dataset = random_split(
                 full_dataset, [n_train, n_val], generator=generator
