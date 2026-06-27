@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+lightning_logs/
+logs/
+# Data directories
+data/
+checkpoints/
+data/datasets/.env
+tb_logs/
+datasets/
+etth1_model_comparison.csv
+
+# caches
+cache/
+.ruff_cache/
+.claude/
