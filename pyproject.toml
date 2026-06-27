@@ -8,7 +8,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "treac"
+name = "trea"
 version = "0.1.0"
 description = "Triple-Encoded Attention for Column-aware time series analysis with robust missing value handling"
 readme = "README.md"
@@ -36,7 +36,7 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["treac*"]
+include = ["trea*"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0.0", "ruff>=0.1.0"]
@@ -132,7 +132,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.isort]
 # Separate imports into sections
-known-first-party = ["treac"]
+known-first-party = ["trea"]
 # Force imports to be on separate lines for better readability
 force-single-line = false
 # Combine star imports

@@ -19,7 +19,7 @@ import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import Dataset
 
-from treac.models import MultiDatasetModel
+from trea.models import MultiDatasetModel
 from utils.multi_dataset_pretrain import DatasetSource, MultiDatasetPretrainDataModule
 from utils.three_w import ThreeWDataset
 

@@ -13,7 +13,7 @@ from data.downloaders.pump_sensor import PumpSensorDataset
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from treac.models.triple_attention import TriplePatchTransformer
+from trea.models.triple_attention import TriplePatchTransformer
 from utils.datamodule import TimeSeriesDataModule
 
 

@@ -14,7 +14,7 @@ from data.downloaders.etth1 import ETTh1Dataset
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 
-from treac.models import PatchTSTNan
+from trea.models import PatchTSTNan
 
 
 def per_sequence_collate_fn(batch):

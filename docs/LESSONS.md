@@ -8,7 +8,7 @@ findings + bug fixes).
 ## 1. What we actually know (empirical)
 
 - **Full-label 3W: trees win.** RF on statistical features = 0.92 macro-F1 vs ~0.81 for
-  the best deep variant, at ~80× less compute. `treac_triple` is statistically *inferior*
+  the best deep variant, at ~80× less compute. `trea_triple` is statistically *inferior*
   to plain `patchtstnan`. → In the supervised regime, architecture tinkering has a low
   ceiling. Stop optimizing it there.
 - **Feature identity is the biggest single architectural lever found** (TREA-R: macro-F1
@@ -62,14 +62,14 @@ The restart pattern thrives on never committing to a verdict. Pre-commit:
 
 ## 5. ChatGPT-suggestion scorecard
 
-| Suggestion | Verdict |
-|---|---|
-| Make feature identity first-class | ✅ Adopted — validated (0.464→0.678) |
-| Preserve missingness masks (no `nan_to_num` pre-model) | ✅ Adopted — loader fixed |
-| Baselines: MLP / TCN / GRU / vanilla transformer (+ trees) | ✅ Adopted — RF already wins full-label |
-| Track macro-F1 / balanced accuracy | ✅ Adopted |
-| Ablations (no row encoder / feature IDs / missingness / context) | ◑ Partial — keep |
-| Axial attention / keep feature tokens alive | ◑ Refined — right direction, wrong priority (baseline-first, conditional) |
+| Suggestion                                                       | Verdict                                                                   |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Make feature identity first-class                                | ✅ Adopted — validated (0.464→0.678)                                       |
+| Preserve missingness masks (no `nan_to_num` pre-model)           | ✅ Adopted — loader fixed                                                  |
+| Baselines: MLP / TCN / GRU / vanilla transformer (+ trees)       | ✅ Adopted — RF already wins full-label                                    |
+| Track macro-F1 / balanced accuracy                               | ✅ Adopted                                                                 |
+| Ablations (no row encoder / feature IDs / missingness / context) | ◑ Partial — keep                                                          |
+| Axial attention / keep feature tokens alive                      | ◑ Refined — right direction, wrong priority (baseline-first, conditional) |
 
 ChatGPT's critique was directionally right but scoped to **supervised, single-dataset**. It
 under-weighted the actual lever: the **low-label / transfer** regime, where trees structurally

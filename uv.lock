@@ -2661,7 +2661,7 @@ wheels = [
 ]
 
 [[package]]
-name = "treac"
+name = "trea"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

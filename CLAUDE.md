@@ -35,7 +35,7 @@ user to run training scripts instead of running them yourself. Avoid commands li
 
 ## Architecture
 
-### Core Models (treac/models/)
+### Core Models (trea/models/)
 
 **TriplePatchTransformer** (`triple_attention.py`)
 
@@ -60,7 +60,7 @@ user to run training scripts instead of running them yourself. Avoid commands li
 - Patch-based time series transformer with NaN handling
 - Efficient temporal modeling using patch-based processing
 
-### Column Embeddings (treac/models/embeddings.py)
+### Column Embeddings (trea/models/embeddings.py)
 
 Column embeddings provide semantic understanding of feature names:
 
@@ -69,7 +69,7 @@ Column embeddings provide semantic understanding of feature names:
 - **Frozen BERT**: Cached embeddings for multi-dataset efficiency
 - **Auto-expanding**: Dynamic vocabularies that grow as new features are encountered
 
-### SSL Objectives (treac/models/ssl_objectives.py)
+### SSL Objectives (trea/models/ssl_objectives.py)
 
 Self-supervised learning objectives for pretraining:
 
@@ -126,7 +126,7 @@ The model can train on datasets with different schemas:
 ### Creating a basic model
 
 ```python
-from treac.models import TriplePatchTransformer
+from trea.models import TriplePatchTransformer
 model = TriplePatchTransformer(
     C_num=7, C_cat=0, cat_cardinalities=[],
     T=96, d_model=128, task='classification',
@@ -137,7 +137,7 @@ model = TriplePatchTransformer(
 ### Multi-dataset with column awareness
 
 ```python
-from treac.models import MultiDatasetModel
+from trea.models import MultiDatasetModel
 model = MultiDatasetModel.create_column_aware(
     c_in=7, seq_len=96, num_classes=3,
     column_names=['HUFL', 'HULL', 'MUFL', 'MULL', 'LUFL', 'LULL', 'OT'],
@@ -182,12 +182,12 @@ data sources: real well data (1,119 files), simulated (1,089), and hand-drawn (2
 - Some report CV scores (inflated vs held-out)
 - High scores (0.92+) are **binary** anomaly detection, not multiclass
 
-| Method | Classes | Features | Metric | Value | Split |
-|--------|---------|----------|--------|-------|-------|
-| Turan (DT, test) | 8 | Stats | macro F1 | 0.85 | held-out |
-| Turan (RF, CV) | 8 | Stats | F1 | 0.91 | CV |
-| Marins (RF) | 7 | Stats | accuracy | 0.94 | held-out |
-| **TREA-C** | **10** | **Raw TS** | **macro F1** | **0.83** | **held-out** |
+| Method           | Classes | Features   | Metric       | Value    | Split        |
+| ---------------- | ------- | ---------- | ------------ | -------- | ------------ |
+| Turan (DT, test) | 8       | Stats      | macro F1     | 0.85     | held-out     |
+| Turan (RF, CV)   | 8       | Stats      | F1           | 0.91     | CV           |
+| Marins (RF)      | 7       | Stats      | accuracy     | 0.94     | held-out     |
+| **TREA-C**       | **10**  | **Raw TS** | **macro F1** | **0.83** | **held-out** |
 
 See `docs/3w_literature_benchmarks.csv` for full details with source URLs.
 
@@ -214,7 +214,7 @@ very few real instances (22 real + 16 simulated files).
 
 ## Project Structure Notes
 
-- **treac/**: Core library with models, embeddings, and training utilities
+- **trea/**: Core library with models, embeddings, and training utilities
 - **utils/**: Helper utilities for datasets and data modules (gitignored data handling)
 - **data/**: Dataset storage (gitignored) with downloaders for public datasets
 - **examples/**: Usage examples and training scripts (DO NOT RUN these directly)

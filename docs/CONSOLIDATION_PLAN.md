@@ -8,12 +8,12 @@ Four codebases attack the same idea — attention over industrial tabular time-s
 value+mask missingness, column-name semantics, intra-row (feature) + inter-row
 (temporal) attention, SSL pretraining for low-label regimes, benchmarked vs trees:
 
-| Repo | Core bet | SSL/pretrain | Baselines | Maturity |
-|---|---|---|---|---|
-| `~/Work/IndustryTransformer/Hephaestus` | numeric-projection tabular attention; multi-output | yes (turbine/NOx) | some | churned (modes added then removed) |
-| `~/Work/IndustryTransformer/TabNCT` | intra-row + inter-row attention + column-name tokens; BERT/causal | yes (w3) | yes (xgboost) | many instability-chasing variants |
-| `~/Work/TREA-C` | patch-based, column-aware (PatchTST-NaN) | yes (masked/temporal/contrastive/causal) | yes (RF, 5-seed non-inferiority stats) | most mature infra |
-| `~/Work/TREA-R` | dual-stage row encoder (feature attn → temporal attn) | no | ad-hoc (`eval_3w.py`) | newest, thinnest |
+| Repo                                    | Core bet                                                          | SSL/pretrain                             | Baselines                              | Maturity                           |
+| --------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------- | -------------------------------------- | ---------------------------------- |
+| `~/Work/IndustryTransformer/Hephaestus` | numeric-projection tabular attention; multi-output                | yes (turbine/NOx)                        | some                                   | churned (modes added then removed) |
+| `~/Work/IndustryTransformer/TabNCT`     | intra-row + inter-row attention + column-name tokens; BERT/causal | yes (w3)                                 | yes (xgboost)                          | many instability-chasing variants  |
+| `~/Work/TREA-C`                         | patch-based, column-aware (PatchTST-NaN)                          | yes (masked/temporal/contrastive/causal) | yes (RF, 5-seed non-inferiority stats) | most mature infra                  |
+| `~/Work/TREA-R`                         | dual-stage row encoder (feature attn → temporal attn)             | no                                       | ad-hoc (`eval_3w.py`)                  | newest, thinnest                   |
 
 ## The core diagnosis
 
@@ -26,15 +26,15 @@ per-class metrics callback that never prints. These almost certainly recur acros
 The ~20% that differs is the attention factorization. **TREA-C's own benchmark shows
 that 20% has a low ceiling:**
 
-| Model (3W, 5-seed) | Macro-F1 | Train s/run |
-|---|---|---|
-| rf_stat_features (Random Forest) | **0.9194** | 12 |
-| multidataset_none | 0.8330 | 276 |
-| patchtstnan | 0.8278 | 294 |
-| multidataset_auto | 0.8198 | 294 |
-| treac_triple (fanciest) | 0.8084 | 1006 |
+| Model (3W, 5-seed)               | Macro-F1   | Train s/run |
+| -------------------------------- | ---------- | ----------- |
+| rf_stat_features (Random Forest) | **0.9194** | 12          |
+| multidataset_none                | 0.8330     | 276         |
+| patchtstnan                      | 0.8278     | 294         |
+| multidataset_auto                | 0.8198     | 294         |
+| trea_triple (fanciest)           | 0.8084     | 1006        |
 
-`treac_triple` is statistically **non-inferior = False** vs every comparator, including
+`trea_triple` is statistically **non-inferior = False** vs every comparator, including
 plain `patchtstnan`; it trails RF by 0.111 macro-F1 at 80× the compute. In the
 **fully-supervised** regime, trees win and architecture tinkering is near-futile.
 

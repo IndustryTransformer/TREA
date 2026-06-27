@@ -20,8 +20,8 @@ from data.downloaders.etth1 import ETTh1Dataset
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import accuracy_score, f1_score
 
-from treac.models.multi_dataset_model import MultiDatasetModel
-from treac.utils import get_checkpoint_path, get_output_path
+from trea.models.multi_dataset_model import MultiDatasetModel
+from trea.utils import get_checkpoint_path, get_output_path
 from utils.datamodule import TimeSeriesDataModule
 
 

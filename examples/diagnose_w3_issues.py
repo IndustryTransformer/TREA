@@ -5,7 +5,7 @@ import time
 import polars as pol
 import torch
 
-from treac.models import PatchTSTNan
+from trea.models import PatchTSTNan
 
 
 def analyze_data_loading():

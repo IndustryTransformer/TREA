@@ -8,7 +8,7 @@ published results from Fernandes et al. (2024):
 
 Usage:
     uv run python examples/benchmark_3w_binary.py
-    uv run python examples/benchmark_3w_binary.py --models treac_triple_stat_tokens,lof,rf --seeds 42,43,44
+    uv run python examples/benchmark_3w_binary.py --models trea_triple_stat_tokens,lof,rf --seeds 42,43,44
 """
 
 from __future__ import annotations
@@ -34,12 +34,12 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 
 sys.path.insert(0, ".")
 
-from treac.models import TriplePatchTransformer
+from trea.models import TriplePatchTransformer
 from utils.three_w import ThreeWDataset
 
 DEEP_MODELS = {
-    "treac_triple",
-    "treac_triple_stat_tokens",
+    "trea_triple",
+    "trea_triple_stat_tokens",
 }
 CLASSICAL_MODELS = {"rf", "lof"}
 ALL_MODELS = DEEP_MODELS | CLASSICAL_MODELS
@@ -143,7 +143,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--models",
         type=str,
-        default="treac_triple_stat_tokens,rf,lof",
+        default="trea_triple_stat_tokens,rf,lof",
         help=f"Comma-separated model IDs from: {sorted(ALL_MODELS)}",
     )
     parser.add_argument(
@@ -292,7 +292,7 @@ def evaluate_torch_binary(
     return binary_metrics(preds, targets)
 
 
-def build_treac(
+def build_trea(
     info: dict[str, Any],
     args: argparse.Namespace,
     use_stat_tokens: bool,
@@ -343,7 +343,7 @@ def run_deep_model(
     dm.set_sampler_seed(seed)
 
     use_stat_tokens = "stat_tokens" in model_name
-    model = build_treac(info=info, args=args, use_stat_tokens=use_stat_tokens)
+    model = build_trea(info=info, args=args, use_stat_tokens=use_stat_tokens)
 
     # Override validation_step to log val_loss for early stopping
     def validation_step_binary(batch, batch_idx):

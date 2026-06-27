@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from treac.models.triple_attention import TriplePatchTransformer
+from trea.models.triple_attention import TriplePatchTransformer
 from utils.datamodule import TimeSeriesDataModule
 
 

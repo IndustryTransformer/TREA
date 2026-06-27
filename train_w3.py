@@ -16,7 +16,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 from torchmetrics import Accuracy, ConfusionMatrix, F1Score
 
-from treac.models import TriplePatchTransformer
+from trea.models import TriplePatchTransformer
 
 
 class W3Dataset(Dataset):

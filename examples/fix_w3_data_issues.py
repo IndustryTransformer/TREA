@@ -208,7 +208,7 @@ def test_fixed_dataset(df):
     df = df.with_columns([pol.col("state").replace_strict(state_to_label)])
 
     # Create a small test
-    from treac.models import PatchTSTNan
+    from trea.models import PatchTSTNan
 
     # Create sample data
     sample_data = df.head(1000).to_pandas()

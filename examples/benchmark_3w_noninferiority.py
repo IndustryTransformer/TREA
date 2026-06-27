@@ -12,8 +12,8 @@ computes validation macro-F1/accuracy, and exports:
 
 Usage:
     uv run python examples/benchmark_3w_noninferiority.py \
-      --models treac_triple,patchtstnan,multidataset_none,rf_stat_features \
-      --candidate-model treac_triple \
+      --models trea_triple,patchtstnan,multidataset_none,rf_stat_features \
+      --candidate-model trea_triple \
       --seeds 42,43,44,45,46 \
       --max-epochs 30 \
       --margin 0.01
@@ -43,15 +43,15 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 
 sys.path.insert(0, ".")
 
-from treac.models import MultiDatasetModel, PatchTSTNan, TriplePatchTransformer
+from trea.models import MultiDatasetModel, PatchTSTNan, TriplePatchTransformer
 from utils.three_w import EVENT_NAMES, ThreeWDataset
 
 
 DEEP_MODELS = {
-    "treac_triple",
-    "treac_triple_no_feature_attn",
-    "treac_triple_stat_tokens",
-    "treac_triple_stat_tokens_no_feature_attn",
+    "trea_triple",
+    "trea_triple_no_feature_attn",
+    "trea_triple_stat_tokens",
+    "trea_triple_stat_tokens_no_feature_attn",
     "patchtstnan",
     "multidataset_none",
     "multidataset_auto",
@@ -152,7 +152,7 @@ def parse_args() -> argparse.Namespace:
         "--models",
         type=str,
         default=(
-            "treac_triple,patchtstnan,multidataset_none,multidataset_auto,"
+            "trea_triple,patchtstnan,multidataset_none,multidataset_auto,"
             "rf_stat_features"
         ),
         help=f"Comma-separated model IDs from: {sorted(ALL_MODELS)}",
@@ -160,7 +160,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--candidate-model",
         type=str,
-        default="treac_triple",
+        default="trea_triple",
         help="Model to test for non-inferiority vs all other selected models",
     )
     parser.add_argument(
@@ -216,7 +216,7 @@ def parse_args() -> argparse.Namespace:
         "--feature-attention-dim",
         type=int,
         default=32,
-        help="Used for treac_triple when feature attention is enabled",
+        help="Used for trea_triple when feature attention is enabled",
     )
     parser.add_argument("--feature-attention-heads", type=int, default=4)
 
@@ -286,7 +286,7 @@ def attach_adamw_optimizer(
     model.configure_optimizers = MethodType(_configure_optimizers, model)
 
 
-def build_treac_triple(
+def build_trea_triple(
     info: dict[str, Any],
     args: argparse.Namespace,
     use_pre_patch_feature_attention: bool,
@@ -699,29 +699,29 @@ def noninferiority_analysis(
 
 
 def build_model(model_name: str, info: dict[str, Any], args: argparse.Namespace):
-    if model_name == "treac_triple":
-        return build_treac_triple(
+    if model_name == "trea_triple":
+        return build_trea_triple(
             info=info,
             args=args,
             use_pre_patch_feature_attention=True,
             use_stat_tokens=False,
         )
-    if model_name == "treac_triple_no_feature_attn":
-        return build_treac_triple(
+    if model_name == "trea_triple_no_feature_attn":
+        return build_trea_triple(
             info=info,
             args=args,
             use_pre_patch_feature_attention=False,
             use_stat_tokens=False,
         )
-    if model_name == "treac_triple_stat_tokens":
-        return build_treac_triple(
+    if model_name == "trea_triple_stat_tokens":
+        return build_trea_triple(
             info=info,
             args=args,
             use_pre_patch_feature_attention=True,
             use_stat_tokens=True,
         )
-    if model_name == "treac_triple_stat_tokens_no_feature_attn":
-        return build_treac_triple(
+    if model_name == "trea_triple_stat_tokens_no_feature_attn":
+        return build_trea_triple(
             info=info,
             args=args,
             use_pre_patch_feature_attention=False,

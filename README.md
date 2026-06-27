@@ -28,7 +28,7 @@ honestly against tree baselines, with **macro-F1 / balanced accuracy** (never ra
 
 - **Seeded from TREA-C** (the most mature base: triple-encoded patch transformer, BERT/frozen-BERT
   semantic column embeddings, multi-dataset training, SSL objectives, and a multi-seed
-  non-inferiority benchmark suite). See `docs/treac_original_README.md` for the inherited API.
+  non-inferiority benchmark suite). See `docs/trea_original_README.md` for the inherited API.
 - **In progress / to harvest** (see `docs/CONSOLIDATION_PLAN.md`):
   - TabNCT's first-class intra-row + inter-row attention and column-name-as-tokens.
   - Hephaestus's numeric projection (only if it earns it in an ablation).
@@ -46,9 +46,9 @@ moot and the semantic-column idea should ship on a simpler backbone.
 
 - `docs/CONSOLIDATION_PLAN.md` — why four repos became one, and the harvest/decision plan.
 - `SEMANTIC_COLUMNS_SUMMARY.md` — column-identity findings + the catalogued bug fixes.
-- `docs/treac_original_README.md` — inherited TREA-C API/usage reference.
+- `docs/trea_original_README.md` — inherited TREA-C API/usage reference.
 
 ## Note on package naming
 
-The Python package is still `treac/` (inherited). Renaming `treac` → `trea` is a tracked
+The Python package is still `trea/` (inherited). Renaming `trea` → `trea` is a tracked
 follow-up refactor; deferred so imports don't break during consolidation.

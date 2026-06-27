@@ -20,7 +20,7 @@ from data.downloaders.multi_dataset_loader import MultiDatasetDataModule
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from treac.models.multi_dataset_model import MultiDatasetModel
+from trea.models.multi_dataset_model import MultiDatasetModel
 
 
 def create_datasets(target_sequence_length: int = 96) -> dict[str, dict[str, Any]]:

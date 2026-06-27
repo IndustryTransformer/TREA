@@ -15,7 +15,7 @@ def get_project_root() -> Path:
         if (parent / "pyproject.toml").exists():
             return parent
 
-    # Fallback: assume we're in treac/utils/ and go up 2 levels
+    # Fallback: assume we're in trea/utils/ and go up 2 levels
     return Path(__file__).resolve().parent.parent.parent
 
 

@@ -13,14 +13,14 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.metrics import accuracy_score, f1_score
 from transformers import PatchTSTConfig, PatchTSTModel
 
-from treac.models import PatchTSTNan
+from trea.models import PatchTSTNan
 
 
 sys.path.append(".")
 
 from torch.utils.data import Dataset
 
-from treac.models.triple_attention import TriplePatchTransformer
+from trea.models.triple_attention import TriplePatchTransformer
 from utils.datamodule import TimeSeriesDataModule
 
 
@@ -368,7 +368,7 @@ class PatchTSTClassifier(pl.LightningModule):
         )
 
 
-# PatchTSTNan is now imported from treac.models
+# PatchTSTNan is now imported from trea.models
 
 
 class CNNClassifier(pl.LightningModule):
@@ -594,7 +594,7 @@ def main():
     print("Training TREA-C (Triple-Patch Transformer)...")
     print("=" * 60)
 
-    treac_model = TriplePatchTransformer(
+    trea_model = TriplePatchTransformer(
         C_num=c_in,
         C_cat=0,  # No categorical features in ETTh1
         cat_cardinalities=[],
@@ -609,8 +609,8 @@ def main():
         lr=1e-3,
     )
 
-    treac_results = train_model(treac_model, dm, "TREA-C", max_epochs=MAX_EPOCHS)
-    results.append(treac_results)
+    trea_results = train_model(trea_model, dm, "TREA-C", max_epochs=MAX_EPOCHS)
+    results.append(trea_results)
 
     # 2. Train HuggingFace PatchTST
     print("\\n" + "=" * 60)

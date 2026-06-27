@@ -1,6 +1,6 @@
 """Unit tests for column embeddings module."""
 
-from treac.models.embeddings import ColumnEmbedding, create_column_embedding
+from trea.models.embeddings import ColumnEmbedding, create_column_embedding
 
 
 class TestColumnEmbedding:

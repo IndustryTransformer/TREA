@@ -27,7 +27,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
-from treac.models import MultiDatasetModel
+from trea.models import MultiDatasetModel
 from utils.three_w import EVENT_NAMES, ThreeWDataset
 
 

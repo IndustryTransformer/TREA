@@ -18,7 +18,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 
-from treac.models.multi_dataset_model import MultiDatasetModel
+from trea.models.multi_dataset_model import MultiDatasetModel
 
 
 def get_dataset(dataset_name: str, split: str, sequence_length: int):

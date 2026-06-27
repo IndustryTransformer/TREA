@@ -14,7 +14,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, Dataset
 
-from treac.models import PatchTSTNan
+from trea.models import PatchTSTNan
 
 
 class W3InMemoryDataset(Dataset):

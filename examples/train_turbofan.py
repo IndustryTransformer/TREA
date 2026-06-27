@@ -16,7 +16,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from treac.models.triple_attention import TriplePatchTransformer
+from trea.models.triple_attention import TriplePatchTransformer
 from utils.datamodule import TimeSeriesDataModule
 
 
@@ -353,7 +353,7 @@ def main():
     print("Training TREA-C (Triple-Patch Transformer)...")
     print("=" * 60)
 
-    treac_model = TriplePatchTransformer(
+    trea_model = TriplePatchTransformer(
         C_num=c_in,
         C_cat=feature_info["n_categorical"],
         cat_cardinalities=feature_info["cat_cardinalities"],
@@ -366,8 +366,8 @@ def main():
         lr=1e-3,
     )
 
-    treac_results = train_model(treac_model, dm, "TREA-C", max_epochs=max_epochs)
-    results.append(treac_results)
+    trea_results = train_model(trea_model, dm, "TREA-C", max_epochs=max_epochs)
+    results.append(trea_results)
 
     # 2. Train PatchTST
     print("\n" + "=" * 60)

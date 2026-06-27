@@ -70,7 +70,7 @@ pip install -e .
 
 ```
 TREA-C/
-├── treac/                          # Core library
+├── trea/                          # Core library
 │   ├── models/                     # Model implementations
 │   │   ├── triple_attention.py     # Core TripleEncodedAttention
 │   │   ├── multi_dataset_model.py  # Multi-dataset training model
@@ -98,7 +98,7 @@ TREA-C/
 
 ```python
 import torch
-from treac.models import TriplePatchTransformer
+from trea.models import TriplePatchTransformer
 from utils import SyntheticTimeSeriesDataset, TimeSeriesDataModule
 import pytorch_lightning as pl
 
@@ -140,7 +140,7 @@ trainer.fit(model, dm)
 ### Multi-Dataset Training with Column Embeddings
 
 ```python
-from treac.models import MultiDatasetModel
+from trea.models import MultiDatasetModel
 from data.downloaders.etth1 import ETTh1Dataset
 
 # Load dataset
@@ -218,7 +218,7 @@ x_num = torch.tensor([
 ### Column Embedding Strategies
 
 ```python
-from treac.models.embeddings import (
+from trea.models.embeddings import (
     create_column_embedding,
     create_multi_dataset_embedder
 )
@@ -308,8 +308,8 @@ non-inferior to baselines on 3W":
 
 ```bash
 uv run python examples/benchmark_3w_noninferiority.py \
-  --models treac_triple,patchtstnan,multidataset_none,multidataset_auto,rf_stat_features \
-  --candidate-model treac_triple \
+  --models trea_triple,patchtstnan,multidataset_none,multidataset_auto,rf_stat_features \
+  --candidate-model trea_triple \
   --seeds 42,43,44,45,46 \
   --max-epochs 30 \
   --margin 0.01 \
@@ -399,7 +399,7 @@ uvx ruff format .
 uvx ruff check . --fix
 
 # Type checking (if using mypy)
-uvx mypy treac/
+uvx mypy trea/
 ```
 
 ## 📚 Citation
@@ -407,7 +407,7 @@ uvx mypy treac/
 If you use TREA-C in your research, please cite:
 
 ```bibtex
-@software{treac2024,
+@software{trea2024,
   title={TREA-C: Triple-Encoded Attention for Column-aware Time Series Analysis},
   author={Your Name},
   year={2024},
