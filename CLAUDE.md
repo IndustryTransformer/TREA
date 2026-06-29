@@ -5,10 +5,50 @@ this repository.
 
 ## Project Overview
 
-TREA-C (Triple-Encoded Attention for Column-aware analysis) is a PyTorch Lightning-based
-library for time series analysis. The core innovation is a triple-encoded architecture
-that handles missing values by encoding them as separate channels (value channels, mask
-channels, and column embeddings) rather than preprocessing NaNs.
+TREA (Triple-Encoded Attention) is a PyTorch Lightning-based library for industrial
+tabular time series. The core innovation is a triple-encoded architecture that handles
+missing values by encoding them as separate channels (value channels, mask channels, and
+column embeddings) rather than preprocessing NaNs.
+
+This is a **consolidated** repo: it merges four archived prototypes (TREA-C, TREA-R,
+TabNCT, Hephaestus), seeded from TREA-C. The Python package is still named `trea/`.
+
+**The thesis (read before optimizing anything):** on fully-labeled benchmarks, trees
+(RF/XGBoost) beat deep models — on 3W, RF ≈ 0.92 macro-F1 vs ~0.81 for the best deep
+variant, at a fraction of the compute. Architecture tinkering has a low ceiling there.
+The defensible edge of a deep model is the regime trees structurally cannot touch:
+**(1) label efficiency** via self-supervised pretraining on abundant unlabeled sensor
+data, and **(2) cross-dataset transfer** via semantic column embeddings. TREA is
+optimized for the expensive-label / multi-dataset setting and benchmarked honestly with
+macro-F1 / balanced accuracy (never raw accuracy).
+
+### Read first (orientation docs)
+
+- `docs/LESSONS.md` — empirical findings, **evaluation protocol, and pre-registered kill
+  criterion**. Read before changing architecture or trusting any benchmark number.
+- `README.md` — the thesis and the one experiment that matters next (label-efficiency curve).
+- `docs/CONSOLIDATION_PLAN.md` — why four repos became one; what to harvest.
+- `SEMANTIC_COLUMNS_SUMMARY.md` — column-identity findings and catalogued bug fixes.
+- `docs/trea_original_README.md` — inherited TREA-C API/usage reference.
+
+## Current focus (immediate next tasks)
+
+Consolidation is mostly done (seeded from TREA-C). Active work, in order:
+
+1. **Harvest from the archived prototypes** (`docs/CONSOLIDATION_PLAN.md`): TabNCT's
+   first-class intra-row + inter-row attention and column-name-as-tokens; Hephaestus's
+   numeric projection only if it earns it in an ablation.
+2. **Port the bug fixes** in `SEMANTIC_COLUMNS_SUMMARY.md` (NaN-mask preservation,
+   class-weight null filter, macro-F1 reporting, the `batch·seq < 65536` attention limit).
+3. **Build the headline experiment**: the label-efficiency curve (macro-F1 vs # labels;
+   RF / from-scratch / pretrained) on 3W + a turbine dataset, on **well-disjoint** splits.
+
+**Anti-thrash rule:** fix bugs in place — do NOT start a fifth repo. The four prototypes
+were archived precisely to stop that pattern.
+
+**Checkpoint-loading gotcha:** the package was renamed `treac` → `trea`, so pretrained
+checkpoints pickled under the old path may need
+`import trea, sys; sys.modules["treac"] = trea` before `load_from_checkpoint`.
 
 ## Development Commands
 
@@ -25,6 +65,14 @@ uv sync --group dev        # Install with dev dependencies
 uvx ruff format       # Format code
 uvx ruff check --fix  # Lint and auto-fix
 uvx ty check          # Type check with ty
+```
+
+### Testing
+
+```bash
+uv run pytest                                         # Run all tests (testpaths=tests/)
+uv run pytest tests/test_column_embeddings.py         # Single file
+uv run pytest tests/test_column_embeddings.py::test_x # Single test
 ```
 
 ### Important: DO NOT run training scripts directly
@@ -79,26 +127,22 @@ Self-supervised learning objectives for pretraining:
 
 ### Data Infrastructure
 
-**Data Loaders** (`data/downloaders/`)
+**Two `utils` locations — do not confuse them:**
 
-- Pre-configured loaders for standard datasets: ETTh1, Human Activity, Air Quality,
-  Financial Markets, NASA Turbofan, Pump Sensor
-- Each loader handles dataset-specific preprocessing and column names
+- **Root `utils/`** (NOT part of the `trea` package): data handling. Imported as
+  `from utils.X import ...`.
+  - `dataset_base.py` — `SyntheticTimeSeriesDataset` (configurable missing-value ratios)
+    and `TimeSeriesDataset` base classes
+  - `datamodule.py` — `TimeSeriesDataModule` (Lightning train/val/test splits)
+  - `data_config.py` — `DatasetConfig` metadata classes
+  - `multi_dataset_pretrain.py` — `MultiDatasetPretrainDataModule`, `DatasetSource`
+  - `three_w.py`, `three_w_columns.py` — 3W dataset loaders + `SENSOR_COLUMNS`
+- **`trea/utils/`** (inside the package): package internals only —
+  `paths.py` (project-root / output-dir helpers) and `sequence_standardization.py`.
 
-**Dataset Base** (`utils/dataset_base.py`)
-
-- `SyntheticTimeSeriesDataset`: Synthetic data for testing with configurable missing
-  value ratios
-- Base classes for time series datasets with numeric and categorical features
-
-**DataModule** (`utils/datamodule.py`)
-
-- PyTorch Lightning DataModules for train/val/test splits
-- Handles batching and data loading for training
-
-**Data Config** (`utils/data_config.py`)
-
-- Configuration classes for dataset metadata
+**Dataset downloaders** live in `scripts/download_*.py` (NASA C-MAPSS, turbofan,
+bearing) and `examples/download_har_dataset.py` — there is **no** `data/downloaders/`
+directory. The `data/` (and `datasets/`) directories are gitignored storage only.
 
 ## Triple-Encoded Architecture
 
@@ -194,7 +238,10 @@ See `docs/3w_literature_benchmarks.csv` for full details with source URLs.
 Class 2 (Spurious Closure of DHSV) is notoriously difficult for all models due to
 very few real instances (22 real + 16 simulated files).
 
-### Current Training Setup (`examples/train_3w.py`)
+### Current Training Setup (`train_w3.py` at repo root — the canonical 3W script)
+
+Note the filename quirk: the dataset is "3W" but the script is `train_w3.py`. An older
+copy exists at `examples/train_3w.py`; prefer the root `train_w3.py` (kept current).
 
 - Window: T=96, stride=96 (non-overlapping)
 - Architecture: d_model=256, n_head=8, num_layers=4, dropout=0.3
@@ -203,7 +250,7 @@ very few real instances (22 real + 16 simulated files).
 - Early stopping on val_loss, patience=10
 - Training was early-stopped at epoch 5 (val_loss) but F1 was still improving at epoch 15
 
-### Key Lessons Learned
+### Key Lessons Learned (training)
 
 - **Do NOT combine class weights in loss + WeightedRandomSampler** — double/triple
   correction hurts performance (especially class 0 Normal recall)
@@ -212,14 +259,37 @@ very few real instances (22 real + 16 simulated files).
 - The official folds file is at `dataset/folds/folds_clf_02.csv` (5-fold CV, real data only)
 - We currently use a random 80/20 file-level split mixing all data sources
 
+### Evaluation protocol — fix before trusting any number (from `docs/LESSONS.md`)
+
+The eval is the underbuilt part; treat existing benchmark numbers (including RF's 0.92)
+as possibly optimistic until re-run under these rules:
+
+- **Well-disjoint (grouped) splits.** 3W missingness is structural — whole sensor
+  columns are absent per well, so the mask channel partly encodes well identity. The
+  current per-instance split lets the model shortcut on "which well is this" → likely
+  leaky. Split by well.
+- **Per-instance, not per-window, metrics.** Windows from one instance are correlated;
+  per-window scoring inflates effective N.
+- **Macro-F1 / balanced accuracy only.** Classes 0+4 are ~91% of windows; raw accuracy lies.
+- **Headline benchmark = label-efficiency curve** (macro-F1 vs # labels; lines for RF /
+  from-scratch / pretrained) on ≥2 datasets. The crossover point is the thesis.
+- A pre-registered **kill criterion** exists in `docs/LESSONS.md` §3 — consult it rather
+  than re-litigating whether the architecture "works."
+- **Do not judge semantic columns on single-dataset accuracy** — their payoff is
+  transfer; single-dataset underperformance is a known (likely embedding-scale) bug.
+
 ## Project Structure Notes
 
-- **trea/**: Core library with models, embeddings, and training utilities
-- **utils/**: Helper utilities for datasets and data modules (gitignored data handling)
-- **data/**: Dataset storage (gitignored) with downloaders for public datasets
-- **examples/**: Usage examples and training scripts (DO NOT RUN these directly)
-- **scripts/**: Utility scripts for pretraining, fine-tuning, and evaluation
-- **tests/**: Unit tests
+- **trea/**: Core library (`models/`, `training/`, `utils/` package internals)
+- **utils/** (repo root, separate from `trea/utils/`): data handling — datamodules,
+  dataset bases, 3W loaders. See "Two `utils` locations" above.
+- **train_w3.py** (repo root): canonical 3W training script
+- **examples/**: usage examples, dataset downloaders, and one-off train/diagnose scripts
+  (DO NOT RUN these directly — tqdm output overflows the context window)
+- **scripts/**: pretraining, fine-tuning, evaluation, and dataset-download utilities
+- **docs/**: orientation docs (LESSONS, CONSOLIDATION_PLAN, benchmarks) — see "Read first"
+- **data/**, **datasets/**, **checkpoints/**, **logs/**: gitignored storage (not in repo)
+- **tests/**: unit tests (currently `test_column_embeddings.py`)
 
 ## Important File Naming Conventions
 

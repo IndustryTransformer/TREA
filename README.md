@@ -50,5 +50,6 @@ moot and the semantic-column idea should ship on a simpler backbone.
 
 ## Note on package naming
 
-The Python package is still `trea/` (inherited). Renaming `trea` → `trea` is a tracked
-follow-up refactor; deferred so imports don't break during consolidation.
+The package was renamed `treac` → `trea` to match the repo. Pretrained checkpoints saved
+under the old package path may need a shim to load:
+`import trea, sys; sys.modules["treac"] = trea` before `load_from_checkpoint`.
