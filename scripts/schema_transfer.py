@@ -302,7 +302,10 @@ def main():
     res = {f: {arm: [] for arm in arms} for f in a.fractions}
 
     for frac in a.fractions:
-        n_lab = max(BATCH if not a.smoke else 64, int(round(len(b_pool) * frac)))
+        # Floor at a small minimum so the 80/20 fit/val split stays viable. Do NOT
+        # floor at BATCH: that silently clamped every fraction below ~4% to the same
+        # n_lab, making the low-label regime (which the criterion hinges on) degenerate.
+        n_lab = max(40 if not a.smoke else 64, int(round(len(b_pool) * frac)))
         n_lab = min(n_lab, len(b_pool))
         for seed in seeds:
             L.seed_everything(seed, verbose=False)
