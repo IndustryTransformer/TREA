@@ -132,6 +132,7 @@ class ThreeWDataset(Dataset):
         stride: int = 192,
         rare_class_stride: int | None = None,
         split: str = "train",
+        split_mode: str = "random",
         val_fraction: float = 0.2,
         normalization_stats: dict[str, np.ndarray] | None = None,
         max_files: int | None = None,
@@ -164,21 +165,46 @@ class ThreeWDataset(Dataset):
         )
         parquet_ds = ParquetDataset(config)
 
-        # Split files at the file level for train/val
+        # Split for train/val. split_mode="random" splits at the file level (a
+        # well's files may span train/val -> leaks well identity, since 3W
+        # missingness is structural per well). split_mode="well" groups by well
+        # so no well appears in both -> honest generalization to unseen wells.
         n_total = len(parquet_ds)
         rng = np.random.RandomState(seed)
-        file_indices = rng.permutation(n_total)
 
-        n_val = int(n_total * val_fraction)
-        n_train = n_total - n_val
+        if split_mode == "well":
+            import re as _re
+
+            well_of = np.array(
+                [
+                    (m.group(1) if (m := _re.search(r"WELL-\d+", str(p))) else f"sim-{i}")
+                    for i, p in enumerate(parquet_ds.files_events)
+                ]
+            )
+            wells = np.array(sorted(set(well_of)))
+            wperm = rng.permutation(len(wells))
+            n_val_wells = max(1, int(round(len(wells) * val_fraction)))
+            val_wells = set(wells[wperm[:n_val_wells]])
+            is_val = np.array([w in val_wells for w in well_of])
+            train_indices = np.where(~is_val)[0]
+            val_indices = np.where(is_val)[0]
+            print(
+                f"[ThreeWDataset] well-grouped split: {len(wells)} wells "
+                f"-> {len(wells) - n_val_wells} train / {n_val_wells} val"
+            )
+        elif split_mode == "random":
+            file_indices = rng.permutation(n_total)
+            n_val = int(n_total * val_fraction)
+            train_indices = file_indices[: n_total - n_val]
+            val_indices = file_indices[n_total - n_val :]
+        else:
+            raise ValueError(f"Unknown split_mode: {split_mode!r}. Use 'random' or 'well'.")
 
         if split == "train":
-            selected_indices = file_indices[:n_train]
-        elif split == "val":
-            selected_indices = file_indices[n_train:]
-        elif split == "test":
+            selected_indices = train_indices
+        elif split in ("val", "test"):
             # Default: use val set as test. Override with file_list for proper eval.
-            selected_indices = file_indices[n_train:]
+            selected_indices = val_indices
         else:
             raise ValueError(
                 f"Unknown split: {split!r}. Use 'train', 'val', or 'test'."

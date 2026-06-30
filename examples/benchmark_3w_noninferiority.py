@@ -43,7 +43,12 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 
 sys.path.insert(0, ".")
 
-from trea.models import MultiDatasetModel, PatchTSTNan, TriplePatchTransformer
+from trea.models import (
+    AxialTransformer,
+    MultiDatasetModel,
+    PatchTSTNan,
+    TriplePatchTransformer,
+)
 from utils.three_w import EVENT_NAMES, ThreeWDataset
 
 
@@ -55,6 +60,7 @@ DEEP_MODELS = {
     "patchtstnan",
     "multidataset_none",
     "multidataset_auto",
+    "axial",
 }
 CLASSICAL_MODELS = {"rf_stat_features"}
 ALL_MODELS = DEEP_MODELS | CLASSICAL_MODELS
@@ -313,6 +319,34 @@ def build_trea_triple(
         feature_attention_dim=args.feature_attention_dim,
         feature_attention_heads=args.feature_attention_heads,
         use_stat_tokens=use_stat_tokens,
+    )
+    model.loss_fn = nn.CrossEntropyLoss()
+    attach_adamw_optimizer(model, lr=args.lr, weight_decay=args.weight_decay)
+    return model
+
+
+def build_axial(info: dict[str, Any], args: argparse.Namespace) -> AxialTransformer:
+    """Axial (intra-row + inter-row) attention with learned feature identity.
+
+    The direct architectural comparator to ``trea_triple``: same triple-encoding
+    inputs, but feature tokens stay alive and are mixed by attention on both axes
+    instead of being flattened into per-patch vectors. Semantic columns are left off
+    (they underperform on single-dataset 3W per LESSONS); enable via the constructor
+    for the transfer experiments.
+    """
+    model = AxialTransformer(
+        C_num=info["n_numeric"],
+        C_cat=info["n_categorical"],
+        cat_cardinalities=info["cat_cardinalities"],
+        T=info["sequence_length"],
+        d_model=args.d_model,
+        task="classification",
+        num_classes=info["num_classes"],
+        n_head=args.n_head,
+        num_layers=args.num_layers,
+        dropout=args.dropout,
+        lr=args.lr,
+        use_feature_id_embedding=True,
     )
     model.loss_fn = nn.CrossEntropyLoss()
     attach_adamw_optimizer(model, lr=args.lr, weight_decay=args.weight_decay)
@@ -726,6 +760,8 @@ def build_model(model_name: str, info: dict[str, Any], args: argparse.Namespace)
             use_pre_patch_feature_attention=False,
             use_stat_tokens=True,
         )
+    if model_name == "axial":
+        return build_axial(info=info, args=args)
     if model_name == "patchtstnan":
         return build_patchtstnan(info=info, args=args)
     if model_name == "multidataset_none":

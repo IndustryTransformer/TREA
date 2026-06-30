@@ -38,13 +38,22 @@ trustworthy.
 
 ## 3. Pre-registered success / kill criterion (decide NOW, not after seeing results)
 
-The restart pattern thrives on never committing to a verdict. Pre-commit:
+The restart pattern thrives on never committing to a verdict. Pre-commit, **per task**
+(the original single macro-F1 criterion can't span a regression + a classification dataset):
 
-- **CONTINUE** the deep-model line only if: pretrained beats RF by ≥ **[X]** macro-F1 at
-  ≤ **[Y]%** labels, on ≥2 datasets, on **well-disjoint** splits.
-- **KILL** it if it can't beat RF + a vanilla transformer in *any* regime → ship the
+- **Turbine NOx (regression, temporal year split):** CONTINUE only if a pretrained→finetuned
+  model beats XGBoost on test RMSE at ≤ **10%** of labels, and the pretrained label-efficiency
+  curve dominates from-scratch across the sweep.
+- **3W binary normal-vs-fault (well-disjoint):** CONTINUE only if the deep model beats RF on
+  AUC over **unseen wells**. (Leaky multiclass 3W numbers are inadmissible — see §1/§2.)
+- **KILL** the deep-model line if it beats neither baseline in its own regime → ship the
   semantic-column idea on a simpler backbone and move on.
-- Fill X / Y from the real industrial label budget (how few labels a deployment actually has).
+
+> **Pre-registered, revised for feasibility before running (2026-06-29):** the turbine set is
+> single-turbine NOx **regression** (temporal split, not classification), and 3W has only ~40
+> wells so a clean well-disjoint *multiclass* eval is infeasible (rare classes live on 1–2
+> wells; RF macro-F1 0.64→0.26 file→well grouped). Hence the per-task criteria above. Locked
+> before results; do not revise after seeing them.
 
 ## 4. Architecture decisions (from the attention analysis)
 
