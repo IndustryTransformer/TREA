@@ -50,7 +50,9 @@ def initialize_parameters(module):
         if module.bias is not None:
             nn.init.constant_(module.bias, 0.0)
     elif isinstance(module, nn.Embedding):
-        nn.init.normal_(module.weight, mean=0.0, std=1.0 / math.sqrt(module.embedding_dim))
+        nn.init.normal_(
+            module.weight, mean=0.0, std=1.0 / math.sqrt(module.embedding_dim)
+        )
     elif isinstance(module, nn.LayerNorm):
         nn.init.ones_(module.weight)
         nn.init.zeros_(module.bias)
@@ -61,7 +63,9 @@ class TransformerEncoderLayer(nn.Module):
 
     def __init__(self, d_model, n_heads, dropout=0.2):
         super().__init__()
-        self.attn = nn.MultiheadAttention(d_model, n_heads, batch_first=True, dropout=dropout)
+        self.attn = nn.MultiheadAttention(
+            d_model, n_heads, batch_first=True, dropout=dropout
+        )
         self.feed_forward = nn.Sequential(
             nn.Linear(d_model, 4 * d_model),
             nn.GELU(),
@@ -86,14 +90,25 @@ class TabularEncoder(nn.Module):
     d_model vector per column token (order: categorical columns, then numeric).
     """
 
-    def __init__(self, config, d_model=128, n_heads=4, n_layers=4, dropout=0.2):
+    def __init__(
+        self,
+        config,
+        d_model=128,
+        n_heads=4,
+        n_layers=4,
+        dropout=0.2,
+        col_embedder=None,
+        column_descriptions=None,
+    ):
         super().__init__()
         self.d_model = d_model
         self.n_numeric_cols = config.n_numeric_cols
         self.n_cat_cols = config.n_cat_cols
 
         self.embeddings = nn.Embedding(config.n_tokens, d_model)
-        self.register_buffer("cat_mask_token", torch.tensor(config.token_dict["[MASK]"]))
+        self.register_buffer(
+            "cat_mask_token", torch.tensor(config.token_dict["[MASK]"])
+        )
         self.register_buffer(
             "numeric_mask_token", torch.tensor(config.token_dict["[NUMERIC_MASK]"])
         )
@@ -101,16 +116,34 @@ class TabularEncoder(nn.Module):
         col_tokens = config.categorical_col_tokens + config.numeric_col_tokens
         self.register_buffer(
             "col_indices",
-            torch.tensor([config.tokens.index(c) for c in col_tokens], dtype=torch.long),
+            torch.tensor(
+                [config.tokens.index(c) for c in col_tokens], dtype=torch.long
+            ),
         )
         self.register_buffer(
             "numeric_indices",
             torch.tensor(
-                [config.tokens.index(c) for c in config.numeric_col_tokens], dtype=torch.long
+                [config.tokens.index(c) for c in config.numeric_col_tokens],
+                dtype=torch.long,
             ),
         )
+
+        # Optional name-keyed column-identity embedder (semantic transfer). When set,
+        # it supplies the per-column query vectors AND the numeric value-scaling
+        # vectors -- both are keyed by column *name*. The internal `embeddings` table
+        # still serves categorical value tokens and the mask tokens (not names).
+        # `column_descriptions` maps a raw column token -> the text actually embedded;
+        # feed descriptions, not terse codes (see column_embeddings.py).
+        self.col_embedder = col_embedder
+        descr = column_descriptions or {}
+        self.col_texts = [descr.get(c, c) for c in col_tokens]
+        self.numeric_texts = [descr.get(c, c) for c in config.numeric_col_tokens]
+
         self.layers = nn.ModuleList(
-            [TransformerEncoderLayer(d_model, n_heads, dropout) for _ in range(n_layers)]
+            [
+                TransformerEncoderLayer(d_model, n_heads, dropout)
+                for _ in range(n_layers)
+            ]
         )
         self.apply(initialize_parameters)
 
@@ -121,14 +154,25 @@ class TabularEncoder(nn.Module):
                 cat_inputs = cat_inputs.unsqueeze(0)
         b = num_inputs.size(0)
 
-        col_emb = self.embeddings(self.col_indices.unsqueeze(0).expand(b, -1))
+        if self.col_embedder is not None:
+            col_emb = self.col_embedder(self.col_texts).unsqueeze(0).expand(b, -1, -1)
+        else:
+            col_emb = self.embeddings(self.col_indices.unsqueeze(0).expand(b, -1))
 
         # Numeric: scale the column's embedding by the value; masked cells (-inf)
         # get the numeric-mask embedding instead.
         expanded = num_inputs.unsqueeze(2).expand(-1, -1, self.d_model)
         with torch.no_grad():
-            num_col_emb = self.embeddings(self.numeric_indices.unsqueeze(0).expand(b, -1))
             inf_mask = (expanded == float("-inf")).all(dim=2)
+        if self.col_embedder is not None:
+            num_col_emb = (
+                self.col_embedder(self.numeric_texts).unsqueeze(0).expand(b, -1, -1)
+            )
+        else:
+            with torch.no_grad():
+                num_col_emb = self.embeddings(
+                    self.numeric_indices.unsqueeze(0).expand(b, -1)
+                )
         base_numeric = torch.zeros_like(expanded)
         base_numeric[~inf_mask] = num_col_emb[~inf_mask] * expanded[~inf_mask]
         base_numeric[inf_mask] = self.embeddings(self.numeric_mask_token)
@@ -165,9 +209,26 @@ class AttentionPooling(nn.Module):
 class TabularRegressor(nn.Module):
     """Encoder + attention pool + MLP head -> scalar prediction."""
 
-    def __init__(self, config, d_model=128, n_heads=4, n_layers=4, dropout=0.2):
+    def __init__(
+        self,
+        config,
+        d_model=128,
+        n_heads=4,
+        n_layers=4,
+        dropout=0.2,
+        col_embedder=None,
+        column_descriptions=None,
+    ):
         super().__init__()
-        self.tabular_encoder = TabularEncoder(config, d_model, n_heads, n_layers, dropout)
+        self.tabular_encoder = TabularEncoder(
+            config,
+            d_model,
+            n_heads,
+            n_layers,
+            dropout,
+            col_embedder,
+            column_descriptions,
+        )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)
         self.regressor = nn.Sequential(
@@ -189,10 +250,27 @@ class TabularRegressor(nn.Module):
 class MaskedTabularEncoder(nn.Module):
     """Encoder + reconstruction heads for masked tabular modeling (MTM pretraining)."""
 
-    def __init__(self, config, d_model=128, n_heads=4, n_layers=4, dropout=0.2):
+    def __init__(
+        self,
+        config,
+        d_model=128,
+        n_heads=4,
+        n_layers=4,
+        dropout=0.2,
+        col_embedder=None,
+        column_descriptions=None,
+    ):
         super().__init__()
         self.config = config
-        self.tabular_encoder = TabularEncoder(config, d_model, n_heads, n_layers, dropout)
+        self.tabular_encoder = TabularEncoder(
+            config,
+            d_model,
+            n_heads,
+            n_layers,
+            dropout,
+            col_embedder,
+            column_descriptions,
+        )
         flat = config.n_columns * d_model
         self.cat_decoder = nn.Linear(flat, config.n_cat_cols * config.n_tokens)
         self.num_decoder = nn.Sequential(
