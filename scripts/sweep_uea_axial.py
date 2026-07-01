@@ -49,6 +49,14 @@ def run_one(args: argparse.Namespace, dataset: str, seed: int, output: Path) -> 
         str(args.epochs),
         "--batch-size",
         str(args.batch_size),
+        "--d-model",
+        str(args.d_model),
+        "--n-head",
+        str(args.n_head),
+        "--num-layers",
+        str(args.num_layers),
+        "--dropout",
+        str(args.dropout),
         "--device",
         args.device,
         "--seed",
@@ -159,6 +167,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--d-model", type=int, default=32)
+    parser.add_argument("--n-head", type=int, default=4)
+    parser.add_argument("--num-layers", type=int, default=2)
+    parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--device", choices=["cpu", "cuda", "auto"], default="cuda")
     parser.add_argument("--models", type=str, default=DEFAULT_MODELS)
     parser.add_argument("--time-patch-len", type=int, default=1)

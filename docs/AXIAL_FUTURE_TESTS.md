@@ -4,7 +4,8 @@ Status after the raw-XGBoost control sweep in
 `logs/uea_sweep_rawflat_core/summary.csv` and the nonlinear tokenizer/mixer
 screen in `logs/uea_sweep_nonlinear_core/summary.csv`. Newer interaction and
 axis-patch screens are logged in `logs/uea_sweep_wild_core/summary.csv` and
-`logs/uea_sweep_axis_patches/summary.csv`.
+`logs/uea_sweep_axis_patches/summary.csv`. The first conv-stem combination screen
+is logged in `logs/uea_sweep_conv_combo/summary.csv`.
 
 ## Current Readout
 
@@ -34,6 +35,10 @@ Across HAR plus a five-dataset UEA sweep:
 - Rectangular axis-patch tokens are worth keeping as an ablation. They match or
   improve plain axial on BasicMotions, Epilepsy, and RacketSports, but they do not
   solve NATOPS or the long 25-class ArticularyWordRecognition case.
+- Axis/global tokens become much more useful when placed after the conv stem.
+  `conv_axial_axis_global` beats XGB+stats on ArticularyWordRecognition, while
+  `conv_axial_axis_patches` and `conv_axial_global_latents` beat XGB+stats on
+  BasicMotions. NATOPS remains unsolved.
 
 ## Benchmark Summary
 
@@ -140,6 +145,35 @@ Readout:
 - Next version should test gated axis patches, multiple feature patch sizes, and
   axis patches combined with `conv_axial`, not only with `conv_patch_mlp`.
 
+## Conv-Combo Screen
+
+Three-seed macro-F1 means from `logs/uea_sweep_conv_combo/summary.csv`:
+
+| Dataset | XGB raw | XGB+stats | Conv-axial | Axial axis | Conv axis | Conv global | Conv axis+global |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ArticularyWordRecognition | 0.805 | 0.867 | 0.827 | 0.517 | 0.873 | 0.841 | 0.885 |
+| BasicMotions | 0.778 | 0.932 | 0.886 | 0.896 | 0.951 | 0.949 | 0.840 |
+| Epilepsy | 0.723 | 0.962 | 0.920 | 0.926 | 0.916 | 0.902 | 0.913 |
+| NATOPS | 0.813 | 0.842 | 0.773 | 0.673 | 0.727 | 0.749 | 0.683 |
+| RacketSports | 0.833 | 0.794 | 0.799 | 0.770 | 0.761 | 0.819 | 0.757 |
+
+Readout:
+
+- The row/column patch idea is materially stronger after a conv stem. It no longer
+  just adds coarse summaries to weak raw tokens; it summarizes locally denoised
+  trajectories.
+- `conv_axial_axis_global` is the first raw/no-feature-engineering model in these
+  screens to beat XGB+stats on ArticularyWordRecognition.
+- `conv_axial_axis_patches` and `conv_axial_global_latents` beat XGB+stats on
+  BasicMotions.
+- `conv_axial_global_latents` is the best raw deep model on RacketSports in this
+  screen, but still trails raw flattened XGB.
+- NATOPS remains a failure case. The next NATOPS branch should not be "more tokens";
+  it needs either better supervision/pretraining, more capacity, or a different
+  inductive bias.
+- The fixed `axis+global` combination is not generally stable. The better version
+  is likely a learned gate/router over raw, axis-patch, and global-latent streams.
+
 ## Working Hypothesis
 
 Attention is learning useful feature/time routing, but the raw cell token is too weak.
@@ -158,9 +192,11 @@ large gaps on ArticularyWordRecognition and NATOPS.
 
 Prioritize tests that reduce the `raw model -> stats-assisted model` gap.
 
-1. **Promote conv-axial, not the new variants, to the 20-dataset sweep**
-   - The first nonlinear screen did not beat the existing conv stem broadly.
-   - Keep `patch_mlp_p8` and `tokenconv_k9` as targeted ablations, not defaults.
+1. **Promote conv-combo variants to the next larger sweep**
+   - Carry `conv_axial`, `conv_axial_axis_patches`,
+     `conv_axial_global_latents`, and `conv_axial_axis_global`.
+   - Keep plain `axial_axis_patches` only as an ablation; it is not competitive on
+     long/many-class data without the conv stem.
 
 2. **Second-generation tokenizer**
    - Combine the good pieces: conv stem quality with learned patch/token projection.
@@ -172,8 +208,8 @@ Prioritize tests that reduce the `raw model -> stats-assisted model` gap.
    - Feed both fine cell/short-patch tokens and coarse window-summary tokens.
    - Coarse tokens should be learned from raw windows, not hand stats.
    - Goal: recover the benefit of XGB-style stats without manually exposing them.
-   - First pass implemented as `axial_axis_patches`; next pass should add gates and
-     combine with `conv_axial`.
+   - First pass implemented as `axial_axis_patches` and
+     `conv_axial_axis_patches`; next pass should add gates/router weights.
 
 4. **Nonlinear cross-feature mixer**
    - Add a gated MLP or bilinear-style mixer after feature-axis attention.
@@ -204,6 +240,18 @@ Prioritize tests that reduce the `raw model -> stats-assisted model` gap.
      `StandWalkJump`.
    - Add at least one forecasting/regression dataset later to avoid overfitting the
      conclusion to classification.
+
+8. **Scale with data, not before data**
+   - The current default model is intentionally small (`d_model=32`, 2 layers) for
+     toy UEA screens and limited labels.
+   - Larger models are reasonable once pretraining uses many public time-series
+     datasets or generated simulation windows.
+   - `scripts/sweep_uea_axial.py` now exposes `--d-model`, `--n-head`,
+     `--num-layers`, and `--dropout`, so medium screens can be launched without
+     editing code.
+   - First medium check: ArticularyWordRecognition and NATOPS with
+     `d_model=64`, 4 layers, comparing `conv_axial`,
+     `conv_axial_axis_patches`, and `conv_axial_axis_global`.
 
 ## Success Criteria
 

@@ -164,6 +164,14 @@ class AxialStatsClassifier(nn.Module):
         num_layers: int,
         dropout: float,
         time_patch_len: int,
+        tokenizer: str = "cell_linear",
+        tokenizer_kernel_size: int = 5,
+        mixer: str = "none",
+        pooling: str = "mean",
+        use_moment_tokens: bool = False,
+        use_axis_patch_tokens: bool = False,
+        feature_patch_size: int | None = None,
+        num_global_tokens: int = 0,
     ) -> None:
         super().__init__()
         self.encoder = AxialEncoder(
@@ -175,6 +183,14 @@ class AxialStatsClassifier(nn.Module):
             dropout=dropout,
             use_feature_id_embedding=True,
             time_patch_len=time_patch_len,
+            tokenizer=tokenizer,
+            tokenizer_kernel_size=tokenizer_kernel_size,
+            mixer=mixer,
+            pooling=pooling,
+            use_moment_tokens=use_moment_tokens,
+            use_axis_patch_tokens=use_axis_patch_tokens,
+            feature_patch_size=feature_patch_size,
+            num_global_tokens=num_global_tokens,
         )
         self.stats_mlp = nn.Sequential(
             nn.LayerNorm(stats_dim),
@@ -215,6 +231,14 @@ class ConvAxialClassifier(nn.Module):
         num_layers: int,
         dropout: float,
         time_patch_len: int,
+        tokenizer: str = "cell_linear",
+        tokenizer_kernel_size: int = 5,
+        mixer: str = "none",
+        pooling: str = "mean",
+        use_moment_tokens: bool = False,
+        use_axis_patch_tokens: bool = False,
+        feature_patch_size: int | None = None,
+        num_global_tokens: int = 0,
     ) -> None:
         super().__init__()
         self.stem = nn.Sequential(
@@ -243,6 +267,14 @@ class ConvAxialClassifier(nn.Module):
             dropout=dropout,
             use_feature_id_embedding=True,
             time_patch_len=time_patch_len,
+            tokenizer=tokenizer,
+            tokenizer_kernel_size=tokenizer_kernel_size,
+            mixer=mixer,
+            pooling=pooling,
+            use_moment_tokens=use_moment_tokens,
+            use_axis_patch_tokens=use_axis_patch_tokens,
+            feature_patch_size=feature_patch_size,
+            num_global_tokens=num_global_tokens,
         )
         self.head = nn.Sequential(
             nn.LayerNorm(d_model),
@@ -786,6 +818,35 @@ def main() -> None:
             {**axial_common, "stats_dim": train[2].shape[1]},
         ),
         ("conv_axial", ConvAxialClassifier, axial_common),
+        (
+            "conv_axial_axis_patches",
+            ConvAxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "patch_mlp",
+                "use_axis_patch_tokens": True,
+                "feature_patch_size": 3,
+            },
+        ),
+        (
+            "conv_axial_global_latents",
+            ConvAxialClassifier,
+            {**axial_common, "num_global_tokens": 4, "pooling": "latent_mean"},
+        ),
+        (
+            "conv_axial_axis_global",
+            ConvAxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "patch_mlp",
+                "use_axis_patch_tokens": True,
+                "feature_patch_size": 3,
+                "num_global_tokens": 4,
+                "pooling": "latent_mean",
+            },
+        ),
         (
             "conv_axial_stats",
             ConvAxialStatsClassifier,

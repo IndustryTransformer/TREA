@@ -336,6 +336,35 @@ def main() -> None:
         ),
         ("conv_axial", ConvAxialClassifier, axial_common),
         (
+            "conv_axial_axis_patches",
+            ConvAxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "patch_mlp",
+                "use_axis_patch_tokens": True,
+                "feature_patch_size": 4,
+            },
+        ),
+        (
+            "conv_axial_global_latents",
+            ConvAxialClassifier,
+            {**axial_common, "num_global_tokens": 4, "pooling": "latent_mean"},
+        ),
+        (
+            "conv_axial_axis_global",
+            ConvAxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "patch_mlp",
+                "use_axis_patch_tokens": True,
+                "feature_patch_size": 4,
+                "num_global_tokens": 4,
+                "pooling": "latent_mean",
+            },
+        ),
+        (
             "conv_axial_stats",
             ConvAxialStatsClassifier,
             {**axial_common, "stats_dim": train[2].shape[1]},
