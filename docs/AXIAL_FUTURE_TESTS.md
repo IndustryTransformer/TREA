@@ -1,7 +1,8 @@
 # Axial Time-Series Future Tests
 
 Status after the raw-XGBoost control sweep in
-`logs/uea_sweep_rawflat_core/summary.csv`.
+`logs/uea_sweep_rawflat_core/summary.csv` and the nonlinear tokenizer/mixer
+screen in `logs/uea_sweep_nonlinear_core/summary.csv`.
 
 ## Current Readout
 
@@ -21,6 +22,9 @@ Across HAR plus a five-dataset UEA sweep:
   use the relevant information when it is exposed.
 - Raw axial still trails stats-assisted axial on several datasets, so the raw
   tokenizer/local pattern extractor is the likely bottleneck.
+- The first nonlinear tokenizer/mixer screen did not produce a universal replacement
+  for `conv_axial`. `patch_mlp_p8` and `tokenconv_k9` are useful targeted leads, but
+  neither met the promotion rule for a 20-dataset sweep.
 
 ## Benchmark Summary
 
@@ -49,6 +53,28 @@ Summary tables should include both XGB controls:
 - `xgb_raw_flat`: raw flattened values only; no feature engineering.
 - `xgb_stats`: engineered window summary variables; practical expert baseline.
 
+## Nonlinear Screen
+
+Three-seed macro-F1 means from `logs/uea_sweep_nonlinear_core/summary.csv`:
+
+| Dataset | XGB raw | Axial | Conv-axial | PatchMLP p8 | TokenConv k9 | Gated mixer | Query pool |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ArticularyWordRecognition | 0.805 | 0.429 | 0.827 | 0.658 | 0.342 | 0.568 | 0.323 |
+| BasicMotions | 0.778 | 0.905 | 0.886 | 0.914 | 0.884 | 0.744 | 0.629 |
+| Epilepsy | 0.723 | 0.923 | 0.920 | 0.935 | 0.902 | 0.913 | 0.884 |
+| NATOPS | 0.813 | 0.707 | 0.773 | 0.577 | 0.791 | 0.686 | 0.500 |
+| RacketSports | 0.833 | 0.762 | 0.799 | 0.736 | 0.710 | 0.732 | 0.734 |
+
+Promotion rule was: beat `axial` by at least 3 macro-F1 points on average, or
+beat `xgb_raw_flat` on at least 3/5 datasets. No new variant passed. Conclusions:
+
+- `patch_mlp_p8` is the strongest new internal tokenizer. It helps
+  ArticularyWordRecognition and Epilepsy but hurts NATOPS and RacketSports.
+- `tokenconv_k9` is the best new NATOPS variant and beats `conv_axial` there, but
+  it is weak on ArticularyWordRecognition and RacketSports.
+- `gated_mixer` alone and `query_pool` should not be promoted in their current form.
+- Existing `conv_axial` remains the best raw deep model to carry into larger sweeps.
+
 ## Working Hypothesis
 
 Attention is learning useful feature/time routing, but the raw cell token is too weak.
@@ -67,18 +93,15 @@ large gaps on ArticularyWordRecognition and NATOPS.
 
 Prioritize tests that reduce the `raw model -> stats-assisted model` gap.
 
-1. **Stronger raw tokenizer**
-   - Replace single-cell `Linear([value, mask])` with a per-feature temporal
-     tokenizer.
-   - Start with depthwise temporal conv blocks because the simple conv stem already
-     helped HAR and RacketSports.
-   - Test kernel sizes 3, 5, 9 and residual vs non-residual stems.
+1. **Promote conv-axial, not the new variants, to the 20-dataset sweep**
+   - The first nonlinear screen did not beat the existing conv stem broadly.
+   - Keep `patch_mlp_p8` and `tokenconv_k9` as targeted ablations, not defaults.
 
-2. **Patch encoder instead of average patching**
-   - Current `time_patch_len` average-pools values/masks and loses local shape.
-   - Encode each feature patch with a small shared MLP or depthwise Conv1d before
-     axial attention.
-   - Compare patch lengths 4, 8, 16 on HAR, NATOPS, and ArticularyWordRecognition.
+2. **Second-generation tokenizer**
+   - Combine the good pieces: conv stem quality with learned patch/token projection.
+   - Try residual depthwise Conv1d over `[value, mask]` before a patch MLP, with
+     patch lengths 4/8 and kernel sizes 5/9.
+   - Add more capacity only inside the tokenizer, not via fixed feature concat.
 
 3. **Multi-scale tokens**
    - Feed both fine cell/short-patch tokens and coarse window-summary tokens.

@@ -31,8 +31,35 @@ from typing import Any
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+import torch.nn.functional as Fnn
 
 from .embeddings import SemanticColumnEmbedder
+
+
+class GatedFeatureMixer(nn.Module):
+    """Set-equivariant nonlinear mixer across features at each timestep."""
+
+    def __init__(self, d_model: int, dropout: float = 0.1):
+        super().__init__()
+        self.norm = nn.LayerNorm(d_model)
+        self.gate = nn.Sequential(
+            nn.Linear(2 * d_model, d_model),
+            nn.GELU(),
+            nn.Linear(d_model, d_model),
+            nn.Sigmoid(),
+        )
+        self.update = nn.Sequential(
+            nn.Linear(2 * d_model, d_model),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model, d_model),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = self.norm(x)
+        context = h.mean(dim=2, keepdim=True).expand_as(h)
+        pair = torch.cat([h, context], dim=-1)
+        return x + self.gate(pair) * self.update(pair)
 
 
 class AxialAttentionBlock(nn.Module):
@@ -49,11 +76,17 @@ class AxialAttentionBlock(nn.Module):
         n_head: int,
         d_ff: int,
         dropout: float = 0.1,
+        mixer: str = "none",
     ):
         super().__init__()
+        if mixer not in {"none", "gated_feature"}:
+            raise ValueError(f"Unknown axial mixer: {mixer}")
         self.feat_norm = nn.LayerNorm(d_model)
         self.feat_attn = nn.MultiheadAttention(
             d_model, n_head, dropout=dropout, batch_first=True
+        )
+        self.feature_mixer = (
+            GatedFeatureMixer(d_model, dropout) if mixer == "gated_feature" else None
         )
         self.time_norm = nn.LayerNorm(d_model)
         self.time_attn = nn.MultiheadAttention(
@@ -76,6 +109,8 @@ class AxialAttentionBlock(nn.Module):
         h = self.feat_norm(x).reshape(B * T, Fdim, d)
         attn, _ = self.feat_attn(h, h, h, need_weights=False)
         x = x + self.dropout(attn.reshape(B, T, Fdim, d))
+        if self.feature_mixer is not None:
+            x = self.feature_mixer(x)
 
         # Time (inter-row) attention: independent per (batch, feature).
         h = self.time_norm(x).permute(0, 2, 1, 3).reshape(B * Fdim, T, d)
@@ -117,24 +152,76 @@ class AxialEncoder(nn.Module):
         semantic_embedder: SemanticColumnEmbedder | None = None,
         num_semantic_features: int | None = None,
         time_patch_len: int = 1,
+        value_num_features: int | None = None,
+        tokenizer: str = "cell_linear",
+        tokenizer_kernel_size: int = 5,
+        mixer: str = "none",
+        pooling: str = "mean",
     ):
         super().__init__()
+        if tokenizer not in {"cell_linear", "temporal_conv", "patch_mlp"}:
+            raise ValueError(f"Unknown axial tokenizer: {tokenizer}")
+        if mixer not in {"none", "gated_feature"}:
+            raise ValueError(f"Unknown axial mixer: {mixer}")
+        if pooling not in {"mean", "query"}:
+            raise ValueError(f"Unknown axial pooling: {pooling}")
+        if tokenizer_kernel_size % 2 == 0:
+            raise ValueError("tokenizer_kernel_size must be odd")
         if d_model % n_head != 0:
             raise ValueError(
                 f"d_model ({d_model}) must be divisible by n_head ({n_head})"
             )
-        if T % time_patch_len != 0:
+        if tokenizer != "patch_mlp" and T % time_patch_len != 0:
             raise ValueError(
                 f"T ({T}) must be divisible by time_patch_len ({time_patch_len})"
             )
         d_ff = d_ff or 4 * d_model
         self.num_features = num_features
+        self.value_num_features = value_num_features or num_features
         self.d_model = d_model
         self.time_patch_len = time_patch_len
-        self.num_steps = T // time_patch_len
+        self.tokenizer = tokenizer
+        self.pooling = pooling
+        self.num_steps = (
+            (T + time_patch_len - 1) // time_patch_len
+            if tokenizer == "patch_mlp"
+            else T // time_patch_len
+        )
 
         # Per-feature token from the [value, mask] pair (the value+mask leg).
         self.value_proj = nn.Linear(2, d_model)
+        self.patch_proj = (
+            nn.Sequential(
+                nn.LayerNorm(2 * time_patch_len),
+                nn.Linear(2 * time_patch_len, d_model),
+                nn.GELU(),
+                nn.Linear(d_model, d_model),
+            )
+            if tokenizer == "patch_mlp"
+            else None
+        )
+        conv_hidden = 4 * self.value_num_features
+        self.temporal_tokenizer = (
+            nn.Sequential(
+                nn.Conv1d(
+                    2 * self.value_num_features,
+                    conv_hidden,
+                    kernel_size=tokenizer_kernel_size,
+                    padding=tokenizer_kernel_size // 2,
+                    groups=self.value_num_features,
+                ),
+                nn.GELU(),
+                nn.Conv1d(
+                    conv_hidden,
+                    2 * self.value_num_features,
+                    kernel_size=tokenizer_kernel_size,
+                    padding=tokenizer_kernel_size // 2,
+                    groups=self.value_num_features,
+                ),
+            )
+            if tokenizer == "temporal_conv"
+            else None
+        )
 
         # Learned per-feature ("index") identity — the strongest single-dataset lever.
         self.feature_id = (
@@ -154,24 +241,62 @@ class AxialEncoder(nn.Module):
         self.input_dropout = nn.Dropout(dropout)
         self.blocks = nn.ModuleList(
             [
-                AxialAttentionBlock(d_model, n_head, d_ff, dropout)
+                AxialAttentionBlock(d_model, n_head, d_ff, dropout, mixer=mixer)
                 for _ in range(num_layers)
             ]
         )
         self.out_norm = nn.LayerNorm(d_model)
+        self.pool_query = (
+            nn.Parameter(torch.randn(1, 1, d_model) * 0.02)
+            if pooling == "query"
+            else None
+        )
+        self.pool_attn = (
+            nn.MultiheadAttention(d_model, n_head, dropout=dropout, batch_first=True)
+            if pooling == "query"
+            else None
+        )
+
+    def _pad_time(self, x: torch.Tensor) -> torch.Tensor:
+        pad = self.num_steps * self.time_patch_len - x.shape[-1]
+        if pad > 0:
+            x = Fnn.pad(x, (0, pad))
+        return x
 
     def build_tokens(self, x_val: torch.Tensor, m_nan: torch.Tensor) -> torch.Tensor:
         """Build ``[B, num_steps, F, d]`` tokens from value/mask ``[B, F, T]``."""
         B, Fdim, T = x_val.shape
+        if Fdim != self.value_num_features:
+            raise ValueError(
+                f"Expected {self.value_num_features} value features, got {Fdim}"
+            )
 
-        if self.time_patch_len > 1:
+        if self.temporal_tokenizer is not None:
+            vm_channels = torch.cat([x_val, m_nan], dim=1)
+            delta = self.temporal_tokenizer(vm_channels)
+            dx, dm = delta.split(Fdim, dim=1)
+            x_val = x_val + dx
+            m_nan = m_nan + dm
+
+        if self.patch_proj is not None:
+            x_patch = self._pad_time(x_val).reshape(
+                B, Fdim, self.num_steps, self.time_patch_len
+            )
+            m_patch = self._pad_time(m_nan).reshape(
+                B, Fdim, self.num_steps, self.time_patch_len
+            )
+            vm_patch = torch.cat([x_patch, m_patch], dim=-1).permute(0, 2, 1, 3)
+            tokens = self.patch_proj(vm_patch)
+        elif self.time_patch_len > 1:
             # Average-pool value and mask within each time patch.
             x_val = x_val.reshape(B, Fdim, self.num_steps, self.time_patch_len).mean(-1)
             m_nan = m_nan.reshape(B, Fdim, self.num_steps, self.time_patch_len).mean(-1)
-
-        # [B, num_steps, F, 2] -> project to d_model.
-        vm = torch.stack([x_val, m_nan], dim=-1).permute(0, 2, 1, 3)
-        tokens = self.value_proj(vm)  # [B, num_steps, F, d]
+            vm = torch.stack([x_val, m_nan], dim=-1).permute(0, 2, 1, 3)
+            tokens = self.value_proj(vm)  # [B, num_steps, F, d]
+        else:
+            # [B, num_steps, F, 2] -> project to d_model.
+            vm = torch.stack([x_val, m_nan], dim=-1).permute(0, 2, 1, 3)
+            tokens = self.value_proj(vm)  # [B, num_steps, F, d]
 
         # Feature identity (broadcast over batch & time).
         if self.feature_id is not None:
@@ -221,7 +346,14 @@ class AxialEncoder(nn.Module):
         tokens = self.out_norm(tokens)
 
         if pool:
-            return tokens.mean(dim=(1, 2))
+            if self.pooling == "mean":
+                return tokens.mean(dim=(1, 2))
+            assert self.pool_query is not None
+            assert self.pool_attn is not None
+            flat = tokens.reshape(tokens.shape[0], -1, tokens.shape[-1])
+            query = self.pool_query.expand(tokens.shape[0], -1, -1)
+            pooled, _ = self.pool_attn(query, flat, flat, need_weights=False)
+            return pooled.squeeze(1)
         return tokens
 
 
@@ -255,6 +387,10 @@ class AxialTransformer(pl.LightningModule):
         use_semantic_columns: bool = False,
         column_descriptions: list[str] | None = None,
         semantic_bert_model: str = "bert-base-uncased",
+        tokenizer: str = "cell_linear",
+        tokenizer_kernel_size: int = 5,
+        mixer: str = "none",
+        pooling: str = "mean",
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -310,6 +446,11 @@ class AxialTransformer(pl.LightningModule):
             semantic_embedder=semantic_embedder,
             num_semantic_features=C_num,
             time_patch_len=time_patch_len,
+            value_num_features=C_num,
+            tokenizer=tokenizer,
+            tokenizer_kernel_size=tokenizer_kernel_size,
+            mixer=mixer,
+            pooling=pooling,
         )
 
         if task == "classification":
@@ -338,6 +479,9 @@ class AxialTransformer(pl.LightningModule):
         )  # [B, T, C_cat, d]
         patch = self.encoder.time_patch_len
         if patch > 1:
+            pad = self.encoder.num_steps * patch - T
+            if pad > 0:
+                toks = Fnn.pad(toks, (0, 0, 0, 0, 0, pad))
             toks = toks.reshape(B, self.encoder.num_steps, patch, C_cat, -1).mean(2)
         return toks
 

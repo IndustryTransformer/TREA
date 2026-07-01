@@ -58,6 +58,17 @@ class TestAxialAttentionBlock:
         assert torch.allclose(out_a[:, 0], out_b[:, 0], atol=1e-5)
         assert not torch.allclose(out_a[:, -1], out_b[:, -1], atol=1e-5)
 
+    def test_gated_mixer_feature_permutation_equivariance(self):
+        block = AxialAttentionBlock(
+            d_model=16, n_head=2, d_ff=32, mixer="gated_feature"
+        ).eval()
+        x = torch.randn(2, 6, 5, 16)
+        perm = torch.tensor([2, 0, 4, 1, 3])
+
+        out_then_perm = block(x)[:, :, perm, :]
+        perm_then_out = block(x[:, :, perm, :])
+        assert torch.allclose(out_then_perm, perm_then_out, atol=1e-5)
+
 
 class TestAxialEncoder:
     def test_pooled_and_token_shapes(self):
@@ -94,11 +105,57 @@ class TestAxialEncoder:
         tokens = enc(torch.randn(2, 3, 12), torch.zeros(2, 3, 12), pool=False)
         assert tokens.shape == (2, 3, 3, 16)  # 12 / 4 = 3 steps
 
+    @pytest.mark.parametrize(
+        ("tokenizer", "patch", "expected_steps"),
+        [
+            ("temporal_conv", 1, 12),
+            ("patch_mlp", 4, 3),
+            ("patch_mlp", 5, 3),
+        ],
+    )
+    def test_tokenizer_shapes(self, tokenizer, patch, expected_steps):
+        enc = AxialEncoder(
+            num_features=3,
+            T=12,
+            d_model=16,
+            n_head=2,
+            num_layers=1,
+            time_patch_len=patch,
+            tokenizer=tokenizer,
+        ).eval()
+        tokens = enc(torch.randn(2, 3, 12), torch.zeros(2, 3, 12), pool=False)
+        assert tokens.shape == (2, expected_steps, 3, 16)
+
+    def test_query_pooling_shape(self):
+        enc = AxialEncoder(
+            num_features=3,
+            T=12,
+            d_model=16,
+            n_head=2,
+            num_layers=1,
+            pooling="query",
+        ).eval()
+        pooled = enc(torch.randn(2, 3, 12), torch.zeros(2, 3, 12), pool=True)
+        assert pooled.shape == (2, 16)
+
     def test_validates_divisibility(self):
         with pytest.raises(ValueError):
             AxialEncoder(num_features=3, T=10, d_model=16, n_head=3)  # 16 % 3
         with pytest.raises(ValueError):
             AxialEncoder(num_features=3, T=10, d_model=16, n_head=2, time_patch_len=3)
+
+    def test_patch_mlp_pads_non_divisible_time(self):
+        enc = AxialEncoder(
+            num_features=3,
+            T=10,
+            d_model=16,
+            n_head=2,
+            num_layers=1,
+            time_patch_len=4,
+            tokenizer="patch_mlp",
+        ).eval()
+        tokens = enc(torch.randn(2, 3, 10), torch.zeros(2, 3, 10), pool=False)
+        assert tokens.shape == (2, 3, 3, 16)
 
 
 class TestAxialTransformer:
@@ -130,6 +187,20 @@ class TestAxialTransformer:
         model = self._model(C_cat=2, cat_cardinalities=[3, 4])
         x_cat = torch.randint(0, 3, (5, 2, 8))
         out = model(torch.randn(5, 4, 8), x_cat)
+        assert out.shape == (5, 3)
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"tokenizer": "temporal_conv", "tokenizer_kernel_size": 5},
+            {"tokenizer": "patch_mlp", "time_patch_len": 4},
+            {"mixer": "gated_feature"},
+            {"pooling": "query"},
+        ],
+    )
+    def test_variant_forward(self, kwargs):
+        model = self._model(**kwargs)
+        out = model(torch.randn(5, 4, 8), torch.empty(5, 0, 8))
         assert out.shape == (5, 3)
 
     def test_nan_mask_is_alive(self):

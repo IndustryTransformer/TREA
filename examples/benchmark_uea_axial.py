@@ -7,6 +7,7 @@ Downloads a dataset from the time-series classification archive, parses the UEA
   xgb_stats         XGBoost on engineered window statistics
   row_pooled        retired historical control; feature-mean pooled transformer
   axial             axial feature/time transformer over raw windows
+  axial_*           raw axial variants with stronger tokenization/mixing/pooling
   axial_stats       axial plus engineered stats
   conv_axial        depthwise temporal conv stem + axial
   conv_axial_stats  conv stem + axial + engineered stats
@@ -222,6 +223,46 @@ def main() -> None:
     builders: list[tuple[str, type[nn.Module], dict]] = [
         ("row_pooled", RowPooledClassifier, common),
         ("axial", AxialClassifier, axial_common),
+        (
+            "axial_tokenconv_k5",
+            AxialClassifier,
+            {**axial_common, "tokenizer": "temporal_conv", "tokenizer_kernel_size": 5},
+        ),
+        (
+            "axial_tokenconv_k9",
+            AxialClassifier,
+            {**axial_common, "tokenizer": "temporal_conv", "tokenizer_kernel_size": 9},
+        ),
+        (
+            "axial_patchmlp_p4",
+            AxialClassifier,
+            {**common, "time_patch_len": 4, "tokenizer": "patch_mlp"},
+        ),
+        (
+            "axial_patchmlp_p8",
+            AxialClassifier,
+            {**common, "time_patch_len": 8, "tokenizer": "patch_mlp"},
+        ),
+        (
+            "axial_gated_mixer",
+            AxialClassifier,
+            {**axial_common, "mixer": "gated_feature"},
+        ),
+        (
+            "axial_tokenconv_gated",
+            AxialClassifier,
+            {
+                **axial_common,
+                "tokenizer": "temporal_conv",
+                "tokenizer_kernel_size": 5,
+                "mixer": "gated_feature",
+            },
+        ),
+        (
+            "axial_query_pool",
+            AxialClassifier,
+            {**axial_common, "pooling": "query"},
+        ),
         (
             "axial_stats",
             AxialStatsClassifier,

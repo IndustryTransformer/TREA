@@ -8,6 +8,7 @@ separates train/test subjects. We compare:
   xgb_stats        XGBoost on engineered window statistics
   row_pooled       retired historical control; feature-mean pooled transformer
   axial            axial feature/time transformer over raw windows
+  axial_*          raw axial variants with stronger tokenization/mixing/pooling
   axial_stats      axial plus the same engineered statistics
 
 Usage:
@@ -103,6 +104,10 @@ class AxialClassifier(nn.Module):
         num_layers: int,
         dropout: float,
         time_patch_len: int,
+        tokenizer: str = "cell_linear",
+        tokenizer_kernel_size: int = 5,
+        mixer: str = "none",
+        pooling: str = "mean",
     ) -> None:
         super().__init__()
         self.model = AxialTransformer(
@@ -118,6 +123,10 @@ class AxialClassifier(nn.Module):
             dropout=dropout,
             use_feature_id_embedding=True,
             time_patch_len=time_patch_len,
+            tokenizer=tokenizer,
+            tokenizer_kernel_size=tokenizer_kernel_size,
+            mixer=mixer,
+            pooling=pooling,
         )
 
     def forward(
@@ -616,7 +625,9 @@ def parse_args() -> argparse.Namespace:
         default="xgb_raw_flat,xgb_stats,axial,axial_stats",
         help=(
             "Comma-separated subset: xgb_raw_flat,xgb_stats,row_pooled,axial,"
-            "axial_stats,conv_axial,conv_axial_stats"
+            "axial_stats,conv_axial,conv_axial_stats,axial_tokenconv_k5,"
+            "axial_tokenconv_k9,axial_patchmlp_p4,axial_patchmlp_p8,"
+            "axial_gated_mixer,axial_tokenconv_gated,axial_query_pool"
         ),
     )
     return parser.parse_args()
@@ -653,6 +664,46 @@ def main() -> None:
     model_builders: list[tuple[str, type[nn.Module], dict]] = [
         ("row_pooled", RowPooledClassifier, common),
         ("axial", AxialClassifier, axial_common),
+        (
+            "axial_tokenconv_k5",
+            AxialClassifier,
+            {**axial_common, "tokenizer": "temporal_conv", "tokenizer_kernel_size": 5},
+        ),
+        (
+            "axial_tokenconv_k9",
+            AxialClassifier,
+            {**axial_common, "tokenizer": "temporal_conv", "tokenizer_kernel_size": 9},
+        ),
+        (
+            "axial_patchmlp_p4",
+            AxialClassifier,
+            {**common, "time_patch_len": 4, "tokenizer": "patch_mlp"},
+        ),
+        (
+            "axial_patchmlp_p8",
+            AxialClassifier,
+            {**common, "time_patch_len": 8, "tokenizer": "patch_mlp"},
+        ),
+        (
+            "axial_gated_mixer",
+            AxialClassifier,
+            {**axial_common, "mixer": "gated_feature"},
+        ),
+        (
+            "axial_tokenconv_gated",
+            AxialClassifier,
+            {
+                **axial_common,
+                "tokenizer": "temporal_conv",
+                "tokenizer_kernel_size": 5,
+                "mixer": "gated_feature",
+            },
+        ),
+        (
+            "axial_query_pool",
+            AxialClassifier,
+            {**axial_common, "pooling": "query"},
+        ),
         (
             "axial_stats",
             AxialStatsClassifier,
