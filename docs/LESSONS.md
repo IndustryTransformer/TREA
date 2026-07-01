@@ -55,6 +55,38 @@ The restart pattern thrives on never committing to a verdict. Pre-commit, **per 
 > wells; RF macro-F1 0.64→0.26 file→well grouped). Hence the per-task criteria above. Locked
 > before results; do not revise after seeing them.
 
+### 3a. Semantic-column transfer — pre-registered MISS → KILL (same-schema rename), 2026-06-30
+
+The distinctive semantic-column bet: a model trained on one schema applies to a renamed
+schema via text-derived column identity. Test (`scripts/schema_transfer.py`): turbine NOx
+split into disjoint Plant A / Plant B, where B is the **same sensors, paraphrased
+descriptions + renamed/reordered codes**; frozen MiniLM embeds the descriptions. Semantic
+NN recovers **9/9** A↔B correspondences (precondition met). Pre-registered criterion: VALID
+iff at ≤10% B-labels **(a)** transfer_semantic < scratch_semantic AND **(b)** transfer_semantic
+< transfer_index (a *charitable* index control that transfers the whole attention stack but
+not the column identities). Result (3 seeds, Plant-B test RMSE, NOx units):
+
+| frac | scr_idx | scr_sem | transfer_idx | transfer_sem | xgb |
+|------|---------|---------|--------------|--------------|-----|
+| 0.01 | 9.24 | 9.10 | **8.55** | 8.56 | 8.68 |
+| 0.02 | 8.88 | 8.95 | **8.35** | 8.44 | 7.90 |
+| 0.05 | 9.27 | 8.17 | **7.72** | 7.83 | 6.76 |
+| 0.10 | 6.76 | 7.25 | **6.33** | 6.90 | 6.08 |
+| 1.00 | 5.62 | 5.15 | **4.77** | 4.91 | 4.69 |
+
+**(a) PASS** — backbone transfer is the low-label lever (both transfer arms beat their
+scratch counterparts through 10%). **(b) FAIL at every ≤10% fraction** (index ahead by
++0.02/+0.09/+0.12/+0.57 — the gap *grows*): **semantic column names add nothing over fresh
+learnable index identities.** XGB is best from 2% on; the deep edge is razor-thin and only
+at ~1% (and transfer-general, not semantic).
+
+**What this kills / doesn't:** kills "semantic helps renamed-but-identical schemas." Does
+NOT test the regime where semantic has a *structural* edge index cannot match — **disjoint /
+variable-width schemas** (B has sensors A never saw → index has no transferable row, semantic
+places the new column near related ones via text). The same-schema arena favors the backbone
+by construction (index just relearns 9 known columns from B's labels). The disjoint-column
+test is the decisive follow-up; pre-register a fresh criterion before running it.
+
 ## 4. Architecture decisions (from the attention analysis)
 
 - **Bottleneck:** the row encoder mean-pools features to one vector per timestep, so the
