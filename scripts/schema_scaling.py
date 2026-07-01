@@ -88,8 +88,9 @@ def standardize(train, other, feat):
 
     def sc(d):
         X = ((d[feat] - mu) / sd).to_numpy(np.float32)
-        X = np.clip(X, -8.0, 8.0)  # tame outliers -> avoid attention-logit overflow/NaN
-        X[np.isnan(X)] = -np.inf  # missing cells -> the model's present=0 sentinel
+        # Tame outliers to avoid attention-logit overflow (clip preserves NaN, which the
+        # model treats as missing natively -- no sentinel conversion needed here).
+        X = np.clip(X, -8.0, 8.0)
         y = ((d["__target__"] - tmu) / tsd).to_numpy(np.float32)
         return X, y
 
@@ -103,7 +104,9 @@ def tensors(X, y):
 # -------------------------------------------------------------------------- model
 def head(d_model, dropout):
     return nn.Sequential(
-        nn.Linear(d_model, 2 * d_model), nn.GELU(), nn.Dropout(dropout),
+        nn.Linear(d_model, 2 * d_model),
+        nn.GELU(),
+        nn.Dropout(dropout),
         nn.Linear(2 * d_model, 1),
     )
 
@@ -191,7 +194,9 @@ def finetune_heldout(model, held, splits, descrs, n_labels, epochs, lr, tscale, 
     rng = np.random.RandomState(seed)
     idx = rng.choice(len(Xtr), size=min(n_labels, len(Xtr)), replace=False)
     Xs, ys = Xtr[idx], ytr[idx]
-    fit_i, val_i = train_test_split(np.arange(len(Xs)), test_size=0.25, random_state=seed)
+    fit_i, val_i = train_test_split(
+        np.arange(len(Xs)), test_size=0.25, random_state=seed
+    )
     loader = DataLoader(
         tensors(Xs[fit_i], ys[fit_i]), batch_size=min(BATCH, len(fit_i)), shuffle=True
     )
@@ -211,7 +216,9 @@ def finetune_heldout(model, held, splits, descrs, n_labels, epochs, lr, tscale, 
         val = eval_rmse(model, name, Xs[val_i], ys[val_i], descrs[name], 1.0)
         if val < best_val - 1e-4:
             best_val, bad = val, 0
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            best_state = {
+                k: v.detach().cpu().clone() for k, v in model.state_dict().items()
+            }
         else:
             bad += 1
             if bad >= patience:
@@ -226,8 +233,15 @@ def xgb_rmse(held, splits, n_labels, tscale, seed):
     (Xtr, ytr), (Xte, yte), _ = splits[name]
     rng = np.random.RandomState(seed)
     idx = rng.choice(len(Xtr), size=min(n_labels, len(Xtr)), replace=False)
-    m = XGBRegressor(n_estimators=400, max_depth=6, learning_rate=0.05,
-                     subsample=0.8, colsample_bytree=0.8, n_jobs=-1, random_state=seed)
+    m = XGBRegressor(
+        n_estimators=400,
+        max_depth=6,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        n_jobs=-1,
+        random_state=seed,
+    )
     m.fit(Xtr[idx], ytr[idx])
     return float(np.sqrt(mean_squared_error(yte, m.predict(Xte)))) * tscale
 
@@ -237,13 +251,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--n-labels", type=int, default=200)
-    ap.add_argument("--held-out", nargs="+",
-                    default=["california_housing", "concrete_compressive_strength", "abalone"])
+    ap.add_argument(
+        "--held-out",
+        nargs="+",
+        default=["california_housing", "concrete_compressive_strength", "abalone"],
+    )
     ap.add_argument("--k-values", type=int, nargs="+", default=[1, 2, 4, 8])
     ap.add_argument("--source-seeds", type=int, default=2)
     a = ap.parse_args()
 
-    pre_ep, ft_ep, ft_lr, pre_lr = (2, 3, 1e-3, 1e-3) if a.smoke else (40, 80, 5e-4, 5e-4)
+    pre_ep, ft_ep, ft_lr, pre_lr = (
+        (2, 3, 1e-3, 1e-3) if a.smoke else (40, 80, 5e-4, 5e-4)
+    )
     if a.smoke:
         a.k_values, a.source_seeds, a.held_out = [1, 2], 1, a.held_out[:1]
 
@@ -259,8 +278,11 @@ def main():
         (Xtr, ytr), (Xte, yte), tsd = standardize(tr, te, d["feat"])
         splits[d["name"]] = ((Xtr, ytr), (Xte, yte), tsd)
 
-    print(f"device={DEV} | corpus={len(corpus)} | held_out={held_list} | "
-          f"K={a.k_values} | n_labels={a.n_labels} | source_seeds={a.source_seeds}", flush=True)
+    print(
+        f"device={DEV} | corpus={len(corpus)} | held_out={held_list} | "
+        f"K={a.k_values} | n_labels={a.n_labels} | source_seeds={a.source_seeds}",
+        flush=True,
+    )
 
     results = []
     for held in held_list:
@@ -274,11 +296,16 @@ def main():
             emb = SemanticColumnEmbedder(descrs[held], D_MODEL)
             sm = SharedModel(emb, [held])
             base["scratch_semantic"].append(
-                finetune_heldout(sm, h, splits, descrs, a.n_labels, ft_ep, ft_lr, tscale, seed)
+                finetune_heldout(
+                    sm, h, splits, descrs, a.n_labels, ft_ep, ft_lr, tscale, seed
+                )
             )
             base["xgb"].append(xgb_rmse(h, splits, a.n_labels, tscale, seed))
         b_sem, b_xgb = np.mean(base["scratch_semantic"]), np.mean(base["xgb"])
-        print(f"\n[{held}] tscale={tscale:.3f} | scratch_semantic={b_sem:.3f} | xgb={b_xgb:.3f}", flush=True)
+        print(
+            f"\n[{held}] tscale={tscale:.3f} | scratch_semantic={b_sem:.3f} | xgb={b_xgb:.3f}",
+            flush=True,
+        )
 
         for K in a.k_values:
             if K > len(pool):
@@ -287,7 +314,9 @@ def main():
                 rmses = []
                 for seed in range(a.source_seeds):
                     rng = np.random.RandomState(1000 * K + seed)
-                    src = [pool[i] for i in rng.choice(len(pool), size=K, replace=False)]
+                    src = [
+                        pool[i] for i in rng.choice(len(pool), size=K, replace=False)
+                    ]
                     src_descr = sorted({t for d in src for t in d["descr"]})
                     if etype == "semantic":
                         emb = SemanticColumnEmbedder(src_descr, D_MODEL)
@@ -296,14 +325,44 @@ def main():
                     model = SharedModel(emb, [d["name"] for d in src] + [held])
                     pretrain(model, src, splits, descrs, pre_ep, pre_lr)
                     rmses.append(
-                        finetune_heldout(model, h, splits, descrs, a.n_labels, ft_ep, ft_lr, tscale, seed)
+                        finetune_heldout(
+                            model,
+                            h,
+                            splits,
+                            descrs,
+                            a.n_labels,
+                            ft_ep,
+                            ft_lr,
+                            tscale,
+                            seed,
+                        )
                     )
                 r = float(np.mean(rmses))
-                results.append({"held_out": held, "K": K, "arm": f"transfer_{etype}",
-                                "rmse": r, "std": float(np.std(rmses)), "n_seeds": a.source_seeds})
-                print(f"  K={K:>2} transfer_{etype:<8} RMSE {r:.3f} +- {np.std(rmses):.3f}", flush=True)
-            results.append({"held_out": held, "K": K, "arm": "scratch_semantic", "rmse": float(b_sem)})
-            results.append({"held_out": held, "K": K, "arm": "xgb", "rmse": float(b_xgb)})
+                results.append(
+                    {
+                        "held_out": held,
+                        "K": K,
+                        "arm": f"transfer_{etype}",
+                        "rmse": r,
+                        "std": float(np.std(rmses)),
+                        "n_seeds": a.source_seeds,
+                    }
+                )
+                print(
+                    f"  K={K:>2} transfer_{etype:<8} RMSE {r:.3f} +- {np.std(rmses):.3f}",
+                    flush=True,
+                )
+            results.append(
+                {
+                    "held_out": held,
+                    "K": K,
+                    "arm": "scratch_semantic",
+                    "rmse": float(b_sem),
+                }
+            )
+            results.append(
+                {"held_out": held, "K": K, "arm": "xgb", "rmse": float(b_xgb)}
+            )
             RESULTS.write_text(json.dumps(results, indent=2))  # incremental checkpoint
 
     # ----- verdict -----
@@ -312,28 +371,50 @@ def main():
     for held in held_list:
         rows = [r for r in results if r["held_out"] == held]
         ks = sorted({r["K"] for r in rows})
+
         def g(K, arm):
             v = [r["rmse"] for r in rows if r["K"] == K and r["arm"] == arm]
             return v[0] if v else float("nan")
-        print(f"\n[{held}]  scratch_semantic={g(ks[0],'scratch_semantic'):.3f}  xgb={g(ks[0],'xgb'):.3f}", flush=True)
-        print(f"  {'K':>3} {'transfer_semantic':>18} {'transfer_index':>16}", flush=True)
+
+        print(
+            f"\n[{held}]  scratch_semantic={g(ks[0], 'scratch_semantic'):.3f}  xgb={g(ks[0], 'xgb'):.3f}",
+            flush=True,
+        )
+        print(
+            f"  {'K':>3} {'transfer_semantic':>18} {'transfer_index':>16}", flush=True
+        )
         for K in ks:
-            print(f"  {K:>3} {g(K,'transfer_semantic'):>18.3f} {g(K,'transfer_index'):>16.3f}", flush=True)
+            print(
+                f"  {K:>3} {g(K, 'transfer_semantic'):>18.3f} {g(K, 'transfer_index'):>16.3f}",
+                flush=True,
+            )
         kmax = ks[-1]
-        slope = g(ks[0], "transfer_semantic") - g(kmax, "transfer_semantic")  # >0 => improves with K
+        slope = g(ks[0], "transfer_semantic") - g(
+            kmax, "transfer_semantic"
+        )  # >0 => improves with K
         v1 = slope > 0
         v2 = g(kmax, "transfer_semantic") < g(kmax, "transfer_index")
         v3 = g(kmax, "transfer_semantic") < g(ks[0], "scratch_semantic")
         verdicts.append((v1, v2, v3))
-        print(f"  (1) improves with K: {'PASS' if v1 else 'FAIL'} (slope {slope:+.3f}) | "
-              f"(2) sem<idx @K={kmax}: {'PASS' if v2 else 'FAIL'} | "
-              f"(3) sem<scratch: {'PASS' if v3 else 'FAIL'}", flush=True)
+        print(
+            f"  (1) improves with K: {'PASS' if v1 else 'FAIL'} (slope {slope:+.3f}) | "
+            f"(2) sem<idx @K={kmax}: {'PASS' if v2 else 'FAIL'} | "
+            f"(3) sem<scratch: {'PASS' if v3 else 'FAIL'}",
+            flush=True,
+        )
 
     n_val = sum(1 for v in verdicts if all(v))
-    print(f"\n=== VERDICT: {n_val}/{len(verdicts)} held-out datasets satisfy ALL of "
-          f"(slope>0, sem<idx, sem<scratch) ===", flush=True)
-    print("VALIDATED (majority)" if n_val > len(verdicts) / 2 else "KILL/INCONCLUSIVE: "
-          "column-name semantics show no scaling transfer signal", flush=True)
+    print(
+        f"\n=== VERDICT: {n_val}/{len(verdicts)} held-out datasets satisfy ALL of "
+        f"(slope>0, sem<idx, sem<scratch) ===",
+        flush=True,
+    )
+    print(
+        "VALIDATED (majority)"
+        if n_val > len(verdicts) / 2
+        else "KILL/INCONCLUSIVE: column-name semantics show no scaling transfer signal",
+        flush=True,
+    )
     print(f"\nresults -> {RESULTS}", flush=True)
 
 

@@ -167,11 +167,12 @@ class TabularEncoder(nn.Module):
             col_emb = self.embeddings(self.col_indices.unsqueeze(0).expand(b, -1))
 
         # Numeric value token = column identity + dense projection of [value, present].
-        # Missing cells (-inf) carry present=0 and value 0, so missingness is learned by
-        # the projection rather than a special token, and identity is never lost.
-        inf_mask = num_inputs == float("-inf")  # [b, n_num]
-        present = (~inf_mask).to(num_inputs.dtype)
-        vals = torch.where(inf_mask, torch.zeros_like(num_inputs), num_inputs)
+        # Any NON-FINITE input (NaN or +/-inf) is treated as MISSING: present=0, value 0,
+        # so missingness is learned by the projection (no special token) and identity is
+        # never lost. Raw NaN from data is handled natively -- no pre-conversion required.
+        missing = ~torch.isfinite(num_inputs)  # [b, n_num]: NaN or inf -> missing
+        present = (~missing).to(num_inputs.dtype)
+        vals = torch.where(missing, torch.zeros_like(num_inputs), num_inputs)
         value_vec = self.num_value_proj(
             torch.stack([vals, present], dim=-1)
         )  # [b, n_num, d]

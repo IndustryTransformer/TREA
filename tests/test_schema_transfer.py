@@ -235,3 +235,18 @@ def test_zero_value_keeps_column_identity():
     assert value_vec.abs().sum() > 1e-6  # value 0 does not zero the token
     tok0, tok1 = ids[0] + value_vec[0], ids[1] + value_vec[0]
     assert not torch.allclose(tok0, tok1, atol=1e-4)  # identity preserved at value 0
+
+
+def test_nan_and_inf_treated_as_missing(semantic):
+    # Raw NaN / inf inputs are handled natively as missing (present=0) -> finite output,
+    # and are equivalent to the -inf missing sentinel. No pre-conversion required.
+    cfg, _ = _cfg_and_df(A_CODES)
+    emb = SemanticColumnEmbedder([A_DESCR[c] for c in A_CODES], d_model=D)
+    m = TabularRegressor(cfg, D, 2, 1, col_embedder=emb, column_descriptions=A_DESCR)
+    m.eval()
+    nan_row = torch.tensor([[0.3, float("nan"), 2.0, float("inf")]])
+    inf_row = torch.tensor([[0.3, float("-inf"), 2.0, float("-inf")]])
+    with torch.no_grad():
+        out_nan, out_inf = m(nan_row, None), m(inf_row, None)
+    assert torch.isfinite(out_nan).all()
+    assert torch.allclose(out_nan, out_inf, atol=1e-6)  # NaN/inf == missing sentinel
