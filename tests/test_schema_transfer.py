@@ -30,7 +30,7 @@ from trea.models.column_embeddings import (  # noqa: E402
     SemanticColumnEmbedder,
     build_column_embedder,
 )
-from trea.models.single_row import TabularRegressor  # noqa: E402
+from trea.models.single_row import TabularEncoder, TabularRegressor  # noqa: E402
 from trea.training.single_row import copy_encoder_weights  # noqa: E402
 from trea.utils.single_row_data import SingleRowConfig  # noqa: E402
 
@@ -198,3 +198,40 @@ def test_index_path_backward_compatible():
     cfg, df = _cfg_and_df(A_CODES)
     m = TabularRegressor(cfg, D, 2, 1)  # col_embedder=None -> original index behaviour
     assert m(_num(df, A_CODES), None).shape == (len(df), 1)
+
+
+# --- permutation invariance (load-bearing for cross-schema transfer) --------------
+
+
+def test_column_permutation_invariance(semantic):
+    # The encoder has no positional term over the column axis: permuting a row's
+    # columns (identity + value together) must not change the output. Cross-schema
+    # transfer relies on this -- if a positional encoding is ever added this breaks.
+    cfg, _ = _cfg_and_df(A_CODES)
+    emb = SemanticColumnEmbedder([A_DESCR[c] for c in A_CODES], d_model=D)
+    m = TabularRegressor(cfg, D, 4, 2, col_embedder=emb, column_descriptions=A_DESCR)
+    m.eval()
+    enc = m.tabular_encoder
+    row = torch.tensor([[0.3, -1.1, 2.0, 0.7]])
+    with torch.no_grad():
+        out_a = m(row, None)
+    perm = [2, 3, 0, 1]
+    enc.col_texts = [enc.col_texts[i] for i in perm]
+    enc.numeric_texts = [enc.numeric_texts[i] for i in perm]
+    with torch.no_grad():
+        out_b = m(row[:, perm], None)
+    assert torch.allclose(out_a, out_b, atol=1e-5)
+
+
+def test_zero_value_keeps_column_identity():
+    # The failure mode of `value * embedding`: at value 0 the numeric token is the zero
+    # vector, so column identity is lost. With `identity + proj([value, present])` a
+    # value of 0 yields a NON-zero token whose identity still distinguishes columns.
+    cfg, _ = _cfg_and_df(A_CODES)
+    emb = SemanticColumnEmbedder([A_DESCR[c] for c in A_CODES], d_model=D)
+    enc = TabularEncoder(cfg, D, 2, 1, col_embedder=emb, column_descriptions=A_DESCR)
+    value_vec = enc.num_value_proj(torch.tensor([[0.0, 1.0]]))  # value 0, present
+    ids = emb(enc.numeric_texts)
+    assert value_vec.abs().sum() > 1e-6  # value 0 does not zero the token
+    tok0, tok1 = ids[0] + value_vec[0], ids[1] + value_vec[0]
+    assert not torch.allclose(tok0, tok1, atol=1e-4)  # identity preserved at value 0

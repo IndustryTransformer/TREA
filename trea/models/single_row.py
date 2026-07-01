@@ -1,11 +1,12 @@
 """Single-row (non-time-series) tabular model for TREA.
 
 A clean, minimal port of the Hephaestus single-row encoder. The idea: every column
-is a token whose *name* is embedded (feature identity); numeric values scale their
-column embedding, categoricals embed their value, and a transformer cross-attends
-column identity against the values. The column-identity embedding is exactly where
-semantic / text-derived column embeddings will later plug in to enable cross-schema
-transfer -- the one thing tree models structurally cannot do.
+is a token whose *name* is embedded (feature identity); a numeric value is projected
+into d_model by a shared dense layer over [value, present] and ADDED to its column
+identity (never scalar-times-vector -- that loses identity at value 0), categoricals
+embed their value, and a transformer cross-attends column identity against the values.
+The column-identity embedding is exactly where semantic / text-derived column
+embeddings plug in to enable cross-schema transfer -- the one thing trees cannot do.
 
 Deliberately omitted vs Hephaestus:
   - the enhanced / CrossNet interaction layers (biggest seed-variance source for the
@@ -21,6 +22,7 @@ Pieces:
 """
 
 import math
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -129,15 +131,20 @@ class TabularEncoder(nn.Module):
         )
 
         # Optional name-keyed column-identity embedder (semantic transfer). When set,
-        # it supplies the per-column query vectors AND the numeric value-scaling
-        # vectors -- both are keyed by column *name*. The internal `embeddings` table
-        # still serves categorical value tokens and the mask tokens (not names).
+        # it supplies the per-column identity vectors keyed by column *name*. The
+        # internal `embeddings` table still serves categorical value tokens (not names).
         # `column_descriptions` maps a raw column token -> the text actually embedded;
         # feed descriptions, not terse codes (see column_embeddings.py).
         self.col_embedder = col_embedder
         descr = column_descriptions or {}
         self.col_texts = [descr.get(c, c) for c in col_tokens]
         self.numeric_texts = [descr.get(c, c) for c in config.numeric_col_tokens]
+
+        # Numeric value encoder: project [value, present_flag] into d_model with a
+        # shared dense layer, then ADD the column identity. Never scale the identity
+        # vector by the scalar value -- that collapses to 0 at value 0 (identity lost)
+        # and is scale-sensitive. Shared across columns => transfers across schemas.
+        self.num_value_proj = nn.Linear(2, d_model)
 
         self.layers = nn.ModuleList(
             [
@@ -159,23 +166,25 @@ class TabularEncoder(nn.Module):
         else:
             col_emb = self.embeddings(self.col_indices.unsqueeze(0).expand(b, -1))
 
-        # Numeric: scale the column's embedding by the value; masked cells (-inf)
-        # get the numeric-mask embedding instead.
-        expanded = num_inputs.unsqueeze(2).expand(-1, -1, self.d_model)
-        with torch.no_grad():
-            inf_mask = (expanded == float("-inf")).all(dim=2)
+        # Numeric value token = column identity + dense projection of [value, present].
+        # Missing cells (-inf) carry present=0 and value 0, so missingness is learned by
+        # the projection rather than a special token, and identity is never lost.
+        inf_mask = num_inputs == float("-inf")  # [b, n_num]
+        present = (~inf_mask).to(num_inputs.dtype)
+        vals = torch.where(inf_mask, torch.zeros_like(num_inputs), num_inputs)
+        value_vec = self.num_value_proj(
+            torch.stack([vals, present], dim=-1)
+        )  # [b, n_num, d]
+
         if self.col_embedder is not None:
             num_col_emb = (
                 self.col_embedder(self.numeric_texts).unsqueeze(0).expand(b, -1, -1)
             )
         else:
-            with torch.no_grad():
-                num_col_emb = self.embeddings(
-                    self.numeric_indices.unsqueeze(0).expand(b, -1)
-                )
-        base_numeric = torch.zeros_like(expanded)
-        base_numeric[~inf_mask] = num_col_emb[~inf_mask] * expanded[~inf_mask]
-        base_numeric[inf_mask] = self.embeddings(self.numeric_mask_token)
+            num_col_emb = self.embeddings(
+                self.numeric_indices.unsqueeze(0).expand(b, -1)
+            )
+        base_numeric = num_col_emb + value_vec
 
         if cat_inputs is not None and self.n_cat_cols > 0:
             cat_emb = self.embeddings(cat_inputs.long())
@@ -185,7 +194,10 @@ class TabularEncoder(nn.Module):
 
         x = self.layers[0](col_emb, values, values)
         for layer in self.layers[1:]:
-            x = x + layer(x, x, x)
+            # The block already carries its own attention/FFN residuals; use its output
+            # directly (a standard post-norm stack). An extra outer `x +` here would
+            # double the skip path and let the residual stream grow with depth.
+            x = layer(x, x, x)
         return x
 
 
