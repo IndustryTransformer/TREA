@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 
 from trea.models.single_row import mask_tensor
 from trea.training.single_row import (
+    SingleRowClassifier,
     SingleRowMTM,
     SingleRowRegressor,
     build_trainer,
@@ -80,11 +81,15 @@ def test_mtm_forward_and_transfer():
 
     # encoder transfer into a regressor with the same d_model must succeed
     cfg_reg = SingleRowConfig.generate(df, target="target")
-    reg = SingleRowRegressor(cfg_reg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS)
+    reg = SingleRowRegressor(
+        cfg_reg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS
+    )
     before = reg.model.tabular_encoder.layers[0].attn.in_proj_weight.clone()
     transfer_encoder(mtm, reg)
     after = reg.model.tabular_encoder.layers[0].attn.in_proj_weight
-    assert torch.allclose(after, mtm.model.tabular_encoder.layers[0].attn.in_proj_weight)
+    assert torch.allclose(
+        after, mtm.model.tabular_encoder.layers[0].attn.in_proj_weight
+    )
     assert not torch.allclose(before, after)  # weights actually changed
 
 
@@ -105,3 +110,41 @@ def test_mask_tensor_fraction_and_dtype():
     assert masked_cat.dtype == torch.long
     mask_id = int(mtm.model.cat_mask_token)
     assert (masked_cat == mask_id).float().mean().item() > 0.15
+
+
+def _toy_clf_df(n=96, n_classes=3, seed=0):
+    rng = np.random.RandomState(seed)
+    df = pd.DataFrame(
+        {
+            "a": rng.randn(n).astype("float32"),
+            "b": rng.randn(n).astype("float32"),
+            "c": rng.randn(n).astype("float32"),
+        }
+    )
+    score = df["a"] * 2 - df["b"]
+    df["target"] = pd.qcut(score, n_classes, labels=False).astype("int64")
+    return df
+
+
+def test_classifier_forward_fit_and_cross_task_transfer():
+    df = _toy_clf_df()
+    cfg = SingleRowConfig.generate(df, target="target")
+    assert cfg.n_cat_cols == 0  # int target is not mistaken for a categorical feature
+    loader = DataLoader(
+        TabularDS(df, cfg), batch_size=16, collate_fn=tabular_collate_fn
+    )
+
+    clf = SingleRowClassifier(
+        cfg, num_classes=3, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS
+    )
+    batch = next(iter(loader))
+    out = clf(batch)
+    assert out.shape == (16, 3) and torch.isfinite(out).all()
+
+    trainer, _ = build_trainer(max_epochs=1, patience=None)
+    trainer.fit(clf, train_dataloaders=loader, val_dataloaders=loader)
+
+    # the encoder is task-agnostic: a regressor's encoder loads into the classifier
+    reg = SingleRowRegressor(cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS)
+    transfer_encoder(reg, clf)  # duck-typed on .model.tabular_encoder
+    assert torch.isfinite(clf(batch)).all()

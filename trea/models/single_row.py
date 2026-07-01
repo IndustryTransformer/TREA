@@ -260,6 +260,49 @@ class TabularRegressor(nn.Module):
         return self.regressor(out)
 
 
+class TabularClassifier(nn.Module):
+    """Encoder + attention pool + MLP head -> class logits.
+
+    Same body as TabularRegressor (so a pretrained encoder transfers to either task);
+    only the final layer differs (``num_classes`` logits instead of a scalar).
+    """
+
+    def __init__(
+        self,
+        config,
+        num_classes,
+        d_model=128,
+        n_heads=4,
+        n_layers=4,
+        dropout=0.2,
+        col_embedder=None,
+        column_descriptions=None,
+    ):
+        super().__init__()
+        self.tabular_encoder = TabularEncoder(
+            config,
+            d_model,
+            n_heads,
+            n_layers,
+            dropout,
+            col_embedder,
+            column_descriptions,
+        )
+        self.pooling = AttentionPooling(d_model)
+        self.dropout = nn.Dropout(dropout)
+        self.head = nn.Sequential(
+            nn.Linear(d_model, 2 * d_model),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(2 * d_model, num_classes),
+        )
+
+    def forward(self, num_inputs, cat_inputs):
+        out = self.tabular_encoder(num_inputs, cat_inputs)
+        out = self.dropout(self.pooling(out))
+        return self.head(out)
+
+
 class MaskedTabularEncoder(nn.Module):
     """Encoder + reconstruction heads for masked tabular modeling (MTM pretraining)."""
 

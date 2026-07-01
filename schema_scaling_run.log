@@ -1,0 +1,113 @@
+device=cuda | corpus=15 | held_out=['california_housing', 'concrete_compressive_strength', 'abalone', 'airfoil_self_noise', 'Bike_Sharing_Demand'] | K=[1, 2, 4, 8, 12] | n_labels=200 | source_seeds=3
+
+[california_housing] tscale=1.151 | scratch_semantic=0.965 | xgb=0.686
+  K= 1 transfer_semantic RMSE 0.951 +- 0.159
+  K= 1 transfer_index    RMSE 1.052 +- 0.010
+  K= 2 transfer_semantic RMSE 0.846 +- 0.007
+  K= 2 transfer_index    RMSE 1.053 +- 0.007
+  K= 4 transfer_semantic RMSE 0.811 +- 0.032
+  K= 4 transfer_index    RMSE 1.046 +- 0.006
+  K= 8 transfer_semantic RMSE 0.853 +- 0.028
+  K= 8 transfer_index    RMSE 1.048 +- 0.009
+  K=12 transfer_semantic RMSE 0.942 +- 0.079
+  K=12 transfer_index    RMSE 1.064 +- 0.004
+
+[concrete_compressive_strength] tscale=16.803 | scratch_semantic=11.493 | xgb=6.872
+  K= 1 transfer_semantic RMSE 12.075 +- 2.177
+  K= 1 transfer_index    RMSE 14.965 +- 0.546
+  K= 2 transfer_semantic RMSE 8.668 +- 0.928
+  K= 2 transfer_index    RMSE 14.743 +- 0.239
+  K= 4 transfer_semantic RMSE 10.416 +- 1.354
+  K= 4 transfer_index    RMSE 14.539 +- 0.126
+  K= 8 transfer_semantic RMSE 8.761 +- 0.469
+  K= 8 transfer_index    RMSE 14.887 +- 0.334
+  K=12 transfer_semantic RMSE 9.777 +- 2.538
+  K=12 transfer_index    RMSE 14.455 +- 0.127
+
+[abalone] tscale=3.239 | scratch_semantic=2.550 | xgb=2.473
+  K= 1 transfer_semantic RMSE 2.513 +- 0.085
+  K= 1 transfer_index    RMSE 2.581 +- 0.010
+  K= 2 transfer_semantic RMSE 2.423 +- 0.106
+  K= 2 transfer_index    RMSE 2.584 +- 0.026
+  K= 4 transfer_semantic RMSE 2.508 +- 0.076
+  K= 4 transfer_index    RMSE 2.597 +- 0.006
+  K= 8 transfer_semantic RMSE 2.486 +- 0.052
+  K= 8 transfer_index    RMSE 2.628 +- 0.046
+  K=12 transfer_semantic RMSE 2.370 +- 0.084
+  K=12 transfer_index    RMSE 2.635 +- 0.053
+
+[airfoil_self_noise] tscale=6.910 | scratch_semantic=4.992 | xgb=3.117
+  K= 1 transfer_semantic RMSE 4.794 +- 0.702
+  K= 1 transfer_index    RMSE 6.088 +- 0.047
+  K= 2 transfer_semantic RMSE 4.385 +- 0.645
+  K= 2 transfer_index    RMSE 6.118 +- 0.022
+  K= 4 transfer_semantic RMSE 4.520 +- 0.064
+  K= 4 transfer_index    RMSE 6.118 +- 0.077
+  K= 8 transfer_semantic RMSE 4.318 +- 0.306
+  K= 8 transfer_index    RMSE 6.257 +- 0.070
+  K=12 transfer_semantic RMSE 4.339 +- 0.096
+  K=12 transfer_index    RMSE 6.052 +- 0.127
+
+[Bike_Sharing_Demand] tscale=182.901 | scratch_semantic=137.574 | xgb=105.540
+  K= 1 transfer_semantic RMSE 133.489 +- 4.756
+  K= 1 transfer_index    RMSE 159.919 +- 0.467
+  K= 2 transfer_semantic RMSE 131.968 +- 8.068
+  K= 2 transfer_index    RMSE 161.079 +- 0.719
+  K= 4 transfer_semantic RMSE 135.720 +- 2.651
+  K= 4 transfer_index    RMSE 160.374 +- 0.699
+  K= 8 transfer_semantic RMSE 135.433 +- 9.957
+  K= 8 transfer_index    RMSE 162.499 +- 2.968
+  K=12 transfer_semantic RMSE 125.962 +- 10.702
+  K=12 transfer_index    RMSE 161.545 +- 2.664
+
+=== SCHEMA-SCALING SUMMARY (held-out test RMSE) ===
+
+[california_housing]  scratch_semantic=0.965  xgb=0.686
+    K  transfer_semantic   transfer_index
+    1              0.951            1.052
+    2              0.846            1.053
+    4              0.811            1.046
+    8              0.853            1.048
+   12              0.942            1.064
+  (1) improves with K: PASS (slope +0.009) | (2) sem<idx @K=12: PASS | (3) sem<scratch: PASS
+
+[concrete_compressive_strength]  scratch_semantic=11.493  xgb=6.872
+    K  transfer_semantic   transfer_index
+    1             12.075           14.965
+    2              8.668           14.743
+    4             10.416           14.539
+    8              8.761           14.887
+   12              9.777           14.455
+  (1) improves with K: PASS (slope +2.298) | (2) sem<idx @K=12: PASS | (3) sem<scratch: PASS
+
+[abalone]  scratch_semantic=2.550  xgb=2.473
+    K  transfer_semantic   transfer_index
+    1              2.513            2.581
+    2              2.423            2.584
+    4              2.508            2.597
+    8              2.486            2.628
+   12              2.370            2.635
+  (1) improves with K: PASS (slope +0.144) | (2) sem<idx @K=12: PASS | (3) sem<scratch: PASS
+
+[airfoil_self_noise]  scratch_semantic=4.992  xgb=3.117
+    K  transfer_semantic   transfer_index
+    1              4.794            6.088
+    2              4.385            6.118
+    4              4.520            6.118
+    8              4.318            6.257
+   12              4.339            6.052
+  (1) improves with K: PASS (slope +0.456) | (2) sem<idx @K=12: PASS | (3) sem<scratch: PASS
+
+[Bike_Sharing_Demand]  scratch_semantic=137.574  xgb=105.540
+    K  transfer_semantic   transfer_index
+    1            133.489          159.919
+    2            131.968          161.079
+    4            135.720          160.374
+    8            135.433          162.499
+   12            125.962          161.545
+  (1) improves with K: PASS (slope +7.527) | (2) sem<idx @K=12: PASS | (3) sem<scratch: PASS
+
+=== VERDICT: 5/5 held-out datasets satisfy ALL of (slope>0, sem<idx, sem<scratch) ===
+VALIDATED (majority)
+
+results -> /home/kailukowiak/Work/TREA/schema_scaling_results.json

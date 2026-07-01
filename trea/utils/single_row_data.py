@@ -40,11 +40,15 @@ class SingleRowConfig:
     target: Optional[str] = None
 
     @classmethod
-    def generate(cls, df: pd.DataFrame, target: Optional[str] = None) -> "SingleRowConfig":
+    def generate(
+        cls, df: pd.DataFrame, target: Optional[str] = None
+    ) -> "SingleRowConfig":
         numeric_cols = [
             c for c in df.select_dtypes(include="number").columns if c != target
         ]
-        cat_cols = list(df.select_dtypes(include="object").columns)
+        cat_cols = [
+            c for c in df.select_dtypes(include="object").columns if c != target
+        ]
         df_cat = df[cat_cols].astype(str)
         object_tokens = sorted({v for c in cat_cols for v in df_cat[c].unique()})
 

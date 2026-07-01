@@ -19,6 +19,7 @@ from torch import nn
 
 from trea.models.single_row import (
     MaskedTabularEncoder,
+    TabularClassifier,
     TabularRegressor,
     mask_tensor,
 )
@@ -57,6 +58,67 @@ class SingleRowRegressor(L.LightningModule):
     def _step(self, batch, name):
         y_hat = self.model(batch.inputs.numeric, batch.inputs.categorical)
         loss = self.loss_fn(y_hat, batch.target)
+        self.log(name, loss, prog_bar=(name == "val_loss"))
+        return loss
+
+    def training_step(self, batch, batch_idx):
+        return self._step(batch, "train_loss")
+
+    def validation_step(self, batch, batch_idx):
+        return self._step(batch, "val_loss")
+
+    def configure_optimizers(self):
+        opt = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-5)
+        sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            opt, mode="min", factor=0.1, patience=3
+        )
+        return {
+            "optimizer": opt,
+            "lr_scheduler": {"scheduler": sched, "monitor": "val_loss"},
+        }
+
+
+class SingleRowClassifier(L.LightningModule):
+    """Supervised classification head on the tabular encoder (macro-F1 the metric).
+
+    Same encoder/pooling as the regressor, so a pretrained encoder transfers to either
+    task via ``transfer_encoder``. Targets are class indices (``long``); the collated
+    target arrives as ``[B, 1]`` float and is cast/flattened here.
+    """
+
+    def __init__(
+        self,
+        config,
+        num_classes,
+        d_model=128,
+        n_heads=4,
+        n_layers=4,
+        lr=8e-4,
+        dropout=0.2,
+        col_embedder=None,
+        column_descriptions=None,
+    ):
+        super().__init__()
+        self.save_hyperparameters(ignore=["config", "col_embedder"])
+        self.lr = lr
+        self.model = TabularClassifier(
+            config,
+            num_classes,
+            d_model,
+            n_heads,
+            n_layers,
+            dropout,
+            col_embedder,
+            column_descriptions,
+        )
+        self.loss_fn = nn.CrossEntropyLoss()
+
+    def forward(self, batch: InputsTarget):
+        return self.model(batch.inputs.numeric, batch.inputs.categorical)
+
+    def _step(self, batch, name):
+        logits = self.model(batch.inputs.numeric, batch.inputs.categorical)
+        loss = self.loss_fn(logits, batch.target.long().view(-1))
         self.log(name, loss, prog_bar=(name == "val_loss"))
         return loss
 
