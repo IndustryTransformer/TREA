@@ -2,7 +2,9 @@
 
 Status after the raw-XGBoost control sweep in
 `logs/uea_sweep_rawflat_core/summary.csv` and the nonlinear tokenizer/mixer
-screen in `logs/uea_sweep_nonlinear_core/summary.csv`.
+screen in `logs/uea_sweep_nonlinear_core/summary.csv`. Newer interaction and
+axis-patch screens are logged in `logs/uea_sweep_wild_core/summary.csv` and
+`logs/uea_sweep_axis_patches/summary.csv`.
 
 ## Current Readout
 
@@ -25,6 +27,13 @@ Across HAR plus a five-dataset UEA sweep:
 - The first nonlinear tokenizer/mixer screen did not produce a universal replacement
   for `conv_axial`. `patch_mlp_p8` and `tokenconv_k9` are useful targeted leads, but
   neither met the promotion rule for a 20-dataset sweep.
+- The larger interaction screen shows that "more LLM-like" is not automatically
+  better at this size. Global latents help NATOPS, conv/patch tokenization helps
+  ArticularyWordRecognition, and bilinear/moment tokens are too unstable as
+  standalone defaults.
+- Rectangular axis-patch tokens are worth keeping as an ablation. They match or
+  improve plain axial on BasicMotions, Epilepsy, and RacketSports, but they do not
+  solve NATOPS or the long 25-class ArticularyWordRecognition case.
 
 ## Benchmark Summary
 
@@ -75,6 +84,62 @@ beat `xgb_raw_flat` on at least 3/5 datasets. No new variant passed. Conclusions
 - `gated_mixer` alone and `query_pool` should not be promoted in their current form.
 - Existing `conv_axial` remains the best raw deep model to carry into larger sweeps.
 
+## Wild Interaction Screen
+
+Three-seed macro-F1 means from `logs/uea_sweep_wild_core/summary.csv`:
+
+| Dataset | XGB raw | XGB+stats | Axial | Conv-axial | ConvPatch p8 | Moment tokens | Global latents | Bilinear mixer | LLM-ish |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ArticularyWordRecognition | 0.805 | 0.867 | 0.429 | 0.827 | 0.604 | 0.463 | 0.459 | 0.383 | 0.697 |
+| BasicMotions | 0.778 | 0.932 | 0.905 | 0.886 | 0.885 | 0.864 | 0.799 | 0.812 | 0.779 |
+| Epilepsy | 0.723 | 0.962 | 0.923 | 0.920 | 0.898 | 0.802 | 0.793 | 0.912 | 0.855 |
+| NATOPS | 0.813 | 0.842 | 0.707 | 0.773 | 0.645 | 0.468 | 0.753 | 0.719 | 0.550 |
+| RacketSports | 0.833 | 0.794 | 0.762 | 0.799 | 0.693 | 0.728 | 0.714 | 0.746 | 0.713 |
+
+Conclusions:
+
+- `conv_axial` remains the strongest general raw deep baseline in this screen.
+- `axial_global_latents` is the cleanest targeted improvement on NATOPS, but hurts
+  BasicMotions, Epilepsy, and ArticularyWordRecognition.
+- `axial_llmish` helps ArticularyWordRecognition versus plain axial but still trails
+  `conv_axial` and is worse on the other four datasets.
+- `axial_bilinear_mixer` is not stable enough to promote. It can be strong on an
+  individual seed but has collapses.
+- `axial_moment_tokens` in the current always-on form should not be promoted. If
+  revisited, it needs gating or conditional use.
+
+## Axis-Patch Screen
+
+`axial_axis_patches` adds rectangular feature-group/time-window tokens alongside the
+raw feature tracks. Each patch token summarizes mean, std, start/end delta,
+absolute temporal change, between-feature spread, and missing rate for a local
+feature group and time patch. This is intended to give attention cheap coarse
+tokens like "this sensor group is slowly increasing" without hand-engineered
+external variables.
+
+Three-seed macro-F1 means from `logs/uea_sweep_axis_patches/summary.csv`:
+
+| Dataset | Axial | Conv-axial | XGB raw | XGB+stats | Axis patches |
+|---|---:|---:|---:|---:|---:|
+| ArticularyWordRecognition | 0.429 | 0.827 | 0.805 | 0.867 | 0.517 |
+| BasicMotions | 0.905 | 0.886 | 0.778 | 0.932 | 0.896 |
+| Epilepsy | 0.923 | 0.920 | 0.723 | 0.962 | 0.926 |
+| NATOPS | 0.707 | 0.773 | 0.813 | 0.842 | 0.673 |
+| RacketSports | 0.762 | 0.799 | 0.833 | 0.794 | 0.770 |
+
+Readout:
+
+- Axis patches support the user's row/column-patch hypothesis enough to keep them.
+  They match plain axial on Epilepsy, nearly match it on BasicMotions, and slightly
+  improve RacketSports.
+- They do not replace a local convolutional inductive bias. On
+  ArticularyWordRecognition, axis patches improve plain axial but are far behind
+  `conv_axial`.
+- NATOPS remains the strongest sign that coarse summaries alone are insufficient;
+  global latents and/or stats-style information matter more there.
+- Next version should test gated axis patches, multiple feature patch sizes, and
+  axis patches combined with `conv_axial`, not only with `conv_patch_mlp`.
+
 ## Working Hypothesis
 
 Attention is learning useful feature/time routing, but the raw cell token is too weak.
@@ -107,22 +172,31 @@ Prioritize tests that reduce the `raw model -> stats-assisted model` gap.
    - Feed both fine cell/short-patch tokens and coarse window-summary tokens.
    - Coarse tokens should be learned from raw windows, not hand stats.
    - Goal: recover the benefit of XGB-style stats without manually exposing them.
+   - First pass implemented as `axial_axis_patches`; next pass should add gates and
+     combine with `conv_axial`.
 
 4. **Nonlinear cross-feature mixer**
    - Add a gated MLP or bilinear-style mixer after feature-axis attention.
    - Motivation: attention supplies weighted sums; the FFN sees each token
      independently afterward. A mixer may help with nonlinear feature-feature
      interactions that stats/tree models capture easily.
+   - First bilinear pass is too unstable to promote; revisit only with residual
+     scaling, gates initialized near zero, or larger models.
 
 5. **Better pooling**
    - Replace final mean pooling with learned query/class-token pooling over
      `[time, feature]` tokens.
    - Test one global query plus optional per-feature queries.
+   - Global latent mean pooling is useful on NATOPS and should be combined with a
+     stronger local tokenizer before dismissal.
 
 6. **Self-supervised pretraining**
    - Mask random cells, contiguous spans, and whole channels.
    - Pretrain on train windows only, then fine-tune labels.
    - Main check: does pretraining reduce the need for engineered stats?
+   - Masked autoencoder scaffold exists in `scripts/pretrain_axial_autoencoder.py`;
+     next step is a real pretrain/fine-tune comparison, not just reconstruction
+     smoke tests.
 
 7. **Dataset expansion**
    - Add more UEA multivariate datasets after the current core five.

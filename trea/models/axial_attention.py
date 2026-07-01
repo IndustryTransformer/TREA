@@ -62,6 +62,30 @@ class GatedFeatureMixer(nn.Module):
         return x + self.gate(pair) * self.update(pair)
 
 
+class BilinearFeatureMixer(nn.Module):
+    """Set-equivariant low-rank nonlinear mixer across features."""
+
+    def __init__(self, d_model: int, rank: int | None = None, dropout: float = 0.1):
+        super().__init__()
+        rank = rank or max(4, d_model // 4)
+        self.norm = nn.LayerNorm(d_model)
+        self.left = nn.Linear(d_model, rank)
+        self.right = nn.Linear(d_model, rank)
+        self.out = nn.Sequential(
+            nn.Linear(rank, d_model),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model, d_model),
+        )
+        self.gate = nn.Sequential(nn.Linear(2 * d_model, d_model), nn.Sigmoid())
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = self.norm(x)
+        context = h.mean(dim=2, keepdim=True).expand_as(h)
+        product = self.left(h) * self.right(context)
+        return x + self.gate(torch.cat([h, context], dim=-1)) * self.out(product)
+
+
 class AxialAttentionBlock(nn.Module):
     """One pre-norm axial block: feature-axis attention, then time-axis, then FFN.
 
@@ -79,15 +103,18 @@ class AxialAttentionBlock(nn.Module):
         mixer: str = "none",
     ):
         super().__init__()
-        if mixer not in {"none", "gated_feature"}:
+        if mixer not in {"none", "gated_feature", "bilinear_feature"}:
             raise ValueError(f"Unknown axial mixer: {mixer}")
         self.feat_norm = nn.LayerNorm(d_model)
         self.feat_attn = nn.MultiheadAttention(
             d_model, n_head, dropout=dropout, batch_first=True
         )
-        self.feature_mixer = (
-            GatedFeatureMixer(d_model, dropout) if mixer == "gated_feature" else None
-        )
+        if mixer == "gated_feature":
+            self.feature_mixer = GatedFeatureMixer(d_model, dropout)
+        elif mixer == "bilinear_feature":
+            self.feature_mixer = BilinearFeatureMixer(d_model, dropout=dropout)
+        else:
+            self.feature_mixer = None
         self.time_norm = nn.LayerNorm(d_model)
         self.time_attn = nn.MultiheadAttention(
             d_model, n_head, dropout=dropout, batch_first=True
@@ -157,21 +184,35 @@ class AxialEncoder(nn.Module):
         tokenizer_kernel_size: int = 5,
         mixer: str = "none",
         pooling: str = "mean",
+        use_moment_tokens: bool = False,
+        use_axis_patch_tokens: bool = False,
+        feature_patch_size: int | None = None,
+        num_global_tokens: int = 0,
     ):
         super().__init__()
-        if tokenizer not in {"cell_linear", "temporal_conv", "patch_mlp"}:
+        if tokenizer not in {
+            "cell_linear",
+            "temporal_conv",
+            "patch_mlp",
+            "conv_patch_mlp",
+        }:
             raise ValueError(f"Unknown axial tokenizer: {tokenizer}")
-        if mixer not in {"none", "gated_feature"}:
+        if mixer not in {"none", "gated_feature", "bilinear_feature"}:
             raise ValueError(f"Unknown axial mixer: {mixer}")
-        if pooling not in {"mean", "query"}:
+        if pooling not in {"mean", "query", "latent_mean"}:
             raise ValueError(f"Unknown axial pooling: {pooling}")
+        if pooling == "latent_mean" and num_global_tokens < 1:
+            raise ValueError("pooling='latent_mean' requires num_global_tokens > 0")
+        if feature_patch_size is not None and feature_patch_size < 1:
+            raise ValueError("feature_patch_size must be positive")
         if tokenizer_kernel_size % 2 == 0:
             raise ValueError("tokenizer_kernel_size must be odd")
         if d_model % n_head != 0:
             raise ValueError(
                 f"d_model ({d_model}) must be divisible by n_head ({n_head})"
             )
-        if tokenizer != "patch_mlp" and T % time_patch_len != 0:
+        patch_tokenizer = tokenizer in {"patch_mlp", "conv_patch_mlp"}
+        if not patch_tokenizer and T % time_patch_len != 0:
             raise ValueError(
                 f"T ({T}) must be divisible by time_patch_len ({time_patch_len})"
             )
@@ -182,9 +223,18 @@ class AxialEncoder(nn.Module):
         self.time_patch_len = time_patch_len
         self.tokenizer = tokenizer
         self.pooling = pooling
+        self.use_moment_tokens = use_moment_tokens
+        self.use_axis_patch_tokens = use_axis_patch_tokens
+        self.feature_patch_size = feature_patch_size or max(
+            1, min(4, self.value_num_features)
+        )
+        self.num_feature_patches = (
+            self.value_num_features + self.feature_patch_size - 1
+        ) // self.feature_patch_size
+        self.num_global_tokens = num_global_tokens
         self.num_steps = (
             (T + time_patch_len - 1) // time_patch_len
-            if tokenizer == "patch_mlp"
+            if patch_tokenizer
             else T // time_patch_len
         )
 
@@ -197,7 +247,7 @@ class AxialEncoder(nn.Module):
                 nn.GELU(),
                 nn.Linear(d_model, d_model),
             )
-            if tokenizer == "patch_mlp"
+            if patch_tokenizer
             else None
         )
         conv_hidden = 4 * self.value_num_features
@@ -219,7 +269,42 @@ class AxialEncoder(nn.Module):
                     groups=self.value_num_features,
                 ),
             )
-            if tokenizer == "temporal_conv"
+            if tokenizer in {"temporal_conv", "conv_patch_mlp"}
+            else None
+        )
+        self.moment_proj = (
+            nn.Sequential(
+                nn.LayerNorm(4),
+                nn.Linear(4, d_model),
+                nn.GELU(),
+                nn.Linear(d_model, d_model),
+            )
+            if use_moment_tokens
+            else None
+        )
+        self.moment_type = (
+            nn.Parameter(torch.randn(1, 1, 1, d_model) * 0.02)
+            if use_moment_tokens
+            else None
+        )
+        self.axis_patch_proj = (
+            nn.Sequential(
+                nn.LayerNorm(6),
+                nn.Linear(6, d_model),
+                nn.GELU(),
+                nn.Linear(d_model, d_model),
+            )
+            if use_axis_patch_tokens
+            else None
+        )
+        self.axis_patch_type = (
+            nn.Parameter(torch.randn(1, 1, 1, d_model) * 0.02)
+            if use_axis_patch_tokens
+            else None
+        )
+        self.axis_patch_id = (
+            nn.Embedding(self.num_feature_patches, d_model)
+            if use_axis_patch_tokens
             else None
         )
 
@@ -236,6 +321,11 @@ class AxialEncoder(nn.Module):
 
         # Time position over (possibly patched) steps.
         self.time_pos = nn.Embedding(self.num_steps, d_model)
+        self.global_tokens = (
+            nn.Parameter(torch.randn(1, 1, num_global_tokens, d_model) * 0.02)
+            if num_global_tokens > 0
+            else None
+        )
 
         self.input_norm = nn.LayerNorm(d_model)
         self.input_dropout = nn.Dropout(dropout)
@@ -257,11 +347,139 @@ class AxialEncoder(nn.Module):
             else None
         )
 
-    def _pad_time(self, x: torch.Tensor) -> torch.Tensor:
+    def _pad_time(self, x: torch.Tensor, value: float = 0.0) -> torch.Tensor:
         pad = self.num_steps * self.time_patch_len - x.shape[-1]
         if pad > 0:
-            x = Fnn.pad(x, (0, pad))
+            x = Fnn.pad(x, (0, pad), value=value)
         return x
+
+    def _patch_view(
+        self, x_val: torch.Tensor, m_nan: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        B, Fdim, _T = x_val.shape
+        x_patch = self._pad_time(x_val).reshape(
+            B, Fdim, self.num_steps, self.time_patch_len
+        )
+        m_patch = self._pad_time(m_nan, value=1.0).reshape(
+            B, Fdim, self.num_steps, self.time_patch_len
+        )
+        return x_patch, m_patch
+
+    def _moment_tokens(self, x_val: torch.Tensor, m_nan: torch.Tensor) -> torch.Tensor:
+        assert self.moment_proj is not None
+        x_patch, m_patch = self._patch_view(x_val, m_nan)
+        valid = (1.0 - m_patch).clamp(0.0, 1.0)
+        denom = valid.sum(dim=-1).clamp(min=1.0)
+        mean = (x_patch * valid).sum(dim=-1) / denom
+        centered = (x_patch - mean.unsqueeze(-1)) * valid
+        std = torch.sqrt((centered.square().sum(dim=-1) / denom).clamp(min=1e-6))
+        delta = (x_patch[..., -1] - x_patch[..., 0]) * (valid[..., -1] * valid[..., 0])
+        if self.time_patch_len > 1:
+            diff = (x_patch[..., 1:] - x_patch[..., :-1]).abs()
+            diff_valid = valid[..., 1:] * valid[..., :-1]
+            absdiff = (diff * diff_valid).sum(dim=-1) / diff_valid.sum(dim=-1).clamp(
+                min=1.0
+            )
+        else:
+            absdiff = torch.zeros_like(mean)
+        stats = torch.stack([mean, std, delta, absdiff], dim=-1).permute(0, 2, 1, 3)
+        tokens = self.moment_proj(stats)
+        assert self.moment_type is not None
+        return tokens + self.moment_type
+
+    def _axis_patch_tokens(
+        self, x_val: torch.Tensor, m_nan: torch.Tensor
+    ) -> torch.Tensor:
+        assert self.axis_patch_proj is not None
+        assert self.axis_patch_type is not None
+        assert self.axis_patch_id is not None
+
+        x_patch, m_patch = self._patch_view(x_val, m_nan)
+        B, Fdim, S, P = x_patch.shape
+        feature_pad = self.num_feature_patches * self.feature_patch_size - Fdim
+        if feature_pad > 0:
+            x_patch = Fnn.pad(x_patch, (0, 0, 0, 0, 0, feature_pad), value=0.0)
+            m_patch = Fnn.pad(m_patch, (0, 0, 0, 0, 0, feature_pad), value=1.0)
+
+        x_group = x_patch.reshape(
+            B, self.num_feature_patches, self.feature_patch_size, S, P
+        )
+        m_group = m_patch.reshape(
+            B, self.num_feature_patches, self.feature_patch_size, S, P
+        )
+        valid = (1.0 - m_group).clamp(0.0, 1.0)
+        denom = valid.sum(dim=(2, 4)).clamp(min=1.0)
+
+        mean = (x_group * valid).sum(dim=(2, 4)) / denom
+        centered = (x_group - mean.unsqueeze(2).unsqueeze(-1)) * valid
+        std = torch.sqrt((centered.square().sum(dim=(2, 4)) / denom).clamp(min=1e-6))
+
+        start_valid = valid[..., 0]
+        end_valid = valid[..., -1]
+        start = (x_group[..., 0] * start_valid).sum(dim=2) / start_valid.sum(
+            dim=2
+        ).clamp(min=1.0)
+        end = (x_group[..., -1] * end_valid).sum(dim=2) / end_valid.sum(dim=2).clamp(
+            min=1.0
+        )
+        delta = end - start
+
+        if self.time_patch_len > 1:
+            diff = (x_group[..., 1:] - x_group[..., :-1]).abs()
+            diff_valid = valid[..., 1:] * valid[..., :-1]
+            absdiff = (diff * diff_valid).sum(dim=(2, 4)) / diff_valid.sum(
+                dim=(2, 4)
+            ).clamp(min=1.0)
+        else:
+            absdiff = torch.zeros_like(mean)
+
+        feature_denom = valid.sum(dim=-1).clamp(min=1.0)
+        feature_means = (x_group * valid).sum(dim=-1) / feature_denom
+        active_features = (feature_denom > 0).float()
+        active_count = active_features.sum(dim=2).clamp(min=1.0)
+        group_feature_mean = (feature_means * active_features).sum(dim=2) / active_count
+        col_spread = torch.sqrt(
+            (
+                ((feature_means - group_feature_mean.unsqueeze(2)) * active_features)
+                .square()
+                .sum(dim=2)
+                / active_count
+            ).clamp(min=1e-6)
+        )
+        missing_rate = 1.0 - valid.mean(dim=(2, 4))
+
+        stats = torch.stack(
+            [mean, std, delta, absdiff, col_spread, missing_rate], dim=-1
+        ).permute(0, 2, 1, 3)
+        tokens = self.axis_patch_proj(stats)
+        patch_ids = torch.arange(self.num_feature_patches, device=x_val.device)
+        steps = torch.arange(self.num_steps, device=x_val.device)
+        return (
+            tokens
+            + self.axis_patch_type
+            + self.axis_patch_id(patch_ids).view(1, 1, -1, self.d_model)
+            + self.time_pos(steps).view(1, self.num_steps, 1, self.d_model)
+        )
+
+    def _add_feature_time_identity(
+        self, tokens: torch.Tensor, Fdim: int, device: torch.device
+    ) -> torch.Tensor:
+        if self.feature_id is not None:
+            ids = torch.arange(Fdim, device=device)
+            tokens = tokens + self.feature_id(ids).view(1, 1, Fdim, self.d_model)
+
+        if self.semantic_embedder is not None:
+            assert self.semantic_norm is not None
+            sem = self.semantic_norm(self.semantic_embedder.get_embeddings())
+            n_sem = self.num_semantic_features or sem.shape[0]
+            pad = torch.zeros(Fdim, self.d_model, device=device, dtype=sem.dtype)
+            pad[:n_sem] = sem[:n_sem]
+            tokens = tokens + pad.view(1, 1, Fdim, self.d_model)
+
+        steps = torch.arange(self.num_steps, device=device)
+        return tokens + self.time_pos(steps).view(
+            1, self.num_steps, 1, self.d_model
+        )
 
     def build_tokens(self, x_val: torch.Tensor, m_nan: torch.Tensor) -> torch.Tensor:
         """Build ``[B, num_steps, F, d]`` tokens from value/mask ``[B, F, T]``."""
@@ -279,12 +497,7 @@ class AxialEncoder(nn.Module):
             m_nan = m_nan + dm
 
         if self.patch_proj is not None:
-            x_patch = self._pad_time(x_val).reshape(
-                B, Fdim, self.num_steps, self.time_patch_len
-            )
-            m_patch = self._pad_time(m_nan).reshape(
-                B, Fdim, self.num_steps, self.time_patch_len
-            )
+            x_patch, m_patch = self._patch_view(x_val, m_nan)
             vm_patch = torch.cat([x_patch, m_patch], dim=-1).permute(0, 2, 1, 3)
             tokens = self.patch_proj(vm_patch)
         elif self.time_patch_len > 1:
@@ -298,23 +511,28 @@ class AxialEncoder(nn.Module):
             vm = torch.stack([x_val, m_nan], dim=-1).permute(0, 2, 1, 3)
             tokens = self.value_proj(vm)  # [B, num_steps, F, d]
 
-        # Feature identity (broadcast over batch & time).
-        if self.feature_id is not None:
-            ids = torch.arange(Fdim, device=x_val.device)
-            tokens = tokens + self.feature_id(ids).view(1, 1, Fdim, self.d_model)
-
-        # Semantic identity on the numeric feature positions.
-        if self.semantic_embedder is not None:
-            assert self.semantic_norm is not None
-            sem = self.semantic_norm(self.semantic_embedder.get_embeddings())
-            n_sem = self.num_semantic_features or sem.shape[0]
-            pad = torch.zeros(Fdim, self.d_model, device=x_val.device, dtype=sem.dtype)
-            pad[:n_sem] = sem[:n_sem]
-            tokens = tokens + pad.view(1, 1, Fdim, self.d_model)
-
-        # Time position (broadcast over batch & features).
-        steps = torch.arange(self.num_steps, device=x_val.device)
-        tokens = tokens + self.time_pos(steps).view(1, self.num_steps, 1, self.d_model)
+        token_groups = [tokens]
+        if self.use_moment_tokens:
+            token_groups.append(self._moment_tokens(x_val, m_nan))
+        tokens = torch.cat(
+            [
+                self._add_feature_time_identity(group, Fdim, x_val.device)
+                for group in token_groups
+            ],
+            dim=2,
+        )
+        if self.use_axis_patch_tokens:
+            tokens = torch.cat(
+                [tokens, self._axis_patch_tokens(x_val, m_nan)],
+                dim=2,
+            )
+        if self.global_tokens is not None:
+            global_tokens = self.global_tokens.expand(B, self.num_steps, -1, -1)
+            steps = torch.arange(self.num_steps, device=x_val.device)
+            global_tokens = global_tokens + self.time_pos(steps).view(
+                1, self.num_steps, 1, self.d_model
+            )
+            tokens = torch.cat([tokens, global_tokens], dim=2)
 
         return self.input_dropout(self.input_norm(tokens))
 
@@ -348,6 +566,8 @@ class AxialEncoder(nn.Module):
         if pool:
             if self.pooling == "mean":
                 return tokens.mean(dim=(1, 2))
+            if self.pooling == "latent_mean":
+                return tokens[:, :, -self.num_global_tokens :, :].mean(dim=(1, 2))
             assert self.pool_query is not None
             assert self.pool_attn is not None
             flat = tokens.reshape(tokens.shape[0], -1, tokens.shape[-1])
@@ -391,6 +611,10 @@ class AxialTransformer(pl.LightningModule):
         tokenizer_kernel_size: int = 5,
         mixer: str = "none",
         pooling: str = "mean",
+        use_moment_tokens: bool = False,
+        use_axis_patch_tokens: bool = False,
+        feature_patch_size: int | None = None,
+        num_global_tokens: int = 0,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -451,6 +675,10 @@ class AxialTransformer(pl.LightningModule):
             tokenizer_kernel_size=tokenizer_kernel_size,
             mixer=mixer,
             pooling=pooling,
+            use_moment_tokens=use_moment_tokens,
+            use_axis_patch_tokens=use_axis_patch_tokens,
+            feature_patch_size=feature_patch_size,
+            num_global_tokens=num_global_tokens,
         )
 
         if task == "classification":

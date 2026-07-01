@@ -69,6 +69,17 @@ class TestAxialAttentionBlock:
         perm_then_out = block(x[:, :, perm, :])
         assert torch.allclose(out_then_perm, perm_then_out, atol=1e-5)
 
+    def test_bilinear_mixer_feature_permutation_equivariance(self):
+        block = AxialAttentionBlock(
+            d_model=16, n_head=2, d_ff=32, mixer="bilinear_feature"
+        ).eval()
+        x = torch.randn(2, 6, 5, 16)
+        perm = torch.tensor([2, 0, 4, 1, 3])
+
+        out_then_perm = block(x)[:, :, perm, :]
+        perm_then_out = block(x[:, :, perm, :])
+        assert torch.allclose(out_then_perm, perm_then_out, atol=1e-5)
+
 
 class TestAxialEncoder:
     def test_pooled_and_token_shapes(self):
@@ -111,6 +122,7 @@ class TestAxialEncoder:
             ("temporal_conv", 1, 12),
             ("patch_mlp", 4, 3),
             ("patch_mlp", 5, 3),
+            ("conv_patch_mlp", 5, 3),
         ],
     )
     def test_tokenizer_shapes(self, tokenizer, patch, expected_steps):
@@ -138,11 +150,48 @@ class TestAxialEncoder:
         pooled = enc(torch.randn(2, 3, 12), torch.zeros(2, 3, 12), pool=True)
         assert pooled.shape == (2, 16)
 
+    def test_moment_and_global_tokens_expand_feature_axis(self):
+        enc = AxialEncoder(
+            num_features=3,
+            T=12,
+            d_model=16,
+            n_head=2,
+            num_layers=1,
+            time_patch_len=4,
+            tokenizer="conv_patch_mlp",
+            use_moment_tokens=True,
+            num_global_tokens=2,
+            pooling="latent_mean",
+        ).eval()
+        tokens = enc(torch.randn(2, 3, 12), torch.zeros(2, 3, 12), pool=False)
+        assert tokens.shape == (2, 3, 8, 16)  # raw + moment tokens + global tracks
+        pooled = enc(torch.randn(2, 3, 12), torch.zeros(2, 3, 12), pool=True)
+        assert pooled.shape == (2, 16)
+
+    def test_axis_patch_tokens_add_feature_group_tracks(self):
+        enc = AxialEncoder(
+            num_features=5,
+            T=12,
+            d_model=16,
+            n_head=2,
+            num_layers=1,
+            time_patch_len=4,
+            tokenizer="conv_patch_mlp",
+            use_axis_patch_tokens=True,
+            feature_patch_size=2,
+        ).eval()
+        tokens = enc(torch.randn(2, 5, 12), torch.zeros(2, 5, 12), pool=False)
+        assert tokens.shape == (2, 3, 8, 16)  # 5 raw + ceil(5 / 2) axis patches
+
     def test_validates_divisibility(self):
         with pytest.raises(ValueError):
             AxialEncoder(num_features=3, T=10, d_model=16, n_head=3)  # 16 % 3
         with pytest.raises(ValueError):
             AxialEncoder(num_features=3, T=10, d_model=16, n_head=2, time_patch_len=3)
+        with pytest.raises(ValueError):
+            AxialEncoder(
+                num_features=3, T=10, d_model=16, n_head=2, pooling="latent_mean"
+            )
 
     def test_patch_mlp_pads_non_divisible_time(self):
         enc = AxialEncoder(
@@ -195,7 +244,23 @@ class TestAxialTransformer:
             {"tokenizer": "temporal_conv", "tokenizer_kernel_size": 5},
             {"tokenizer": "patch_mlp", "time_patch_len": 4},
             {"mixer": "gated_feature"},
+            {"mixer": "bilinear_feature"},
             {"pooling": "query"},
+            {"num_global_tokens": 2, "pooling": "latent_mean"},
+            {
+                "tokenizer": "conv_patch_mlp",
+                "time_patch_len": 4,
+                "use_moment_tokens": True,
+                "num_global_tokens": 2,
+                "pooling": "latent_mean",
+                "mixer": "bilinear_feature",
+            },
+            {
+                "tokenizer": "conv_patch_mlp",
+                "time_patch_len": 4,
+                "use_axis_patch_tokens": True,
+                "feature_patch_size": 2,
+            },
         ],
     )
     def test_variant_forward(self, kwargs):

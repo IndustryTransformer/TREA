@@ -108,6 +108,10 @@ class AxialClassifier(nn.Module):
         tokenizer_kernel_size: int = 5,
         mixer: str = "none",
         pooling: str = "mean",
+        use_moment_tokens: bool = False,
+        use_axis_patch_tokens: bool = False,
+        feature_patch_size: int | None = None,
+        num_global_tokens: int = 0,
     ) -> None:
         super().__init__()
         self.model = AxialTransformer(
@@ -127,6 +131,10 @@ class AxialClassifier(nn.Module):
             tokenizer_kernel_size=tokenizer_kernel_size,
             mixer=mixer,
             pooling=pooling,
+            use_moment_tokens=use_moment_tokens,
+            use_axis_patch_tokens=use_axis_patch_tokens,
+            feature_patch_size=feature_patch_size,
+            num_global_tokens=num_global_tokens,
         )
 
     def forward(
@@ -627,7 +635,9 @@ def parse_args() -> argparse.Namespace:
             "Comma-separated subset: xgb_raw_flat,xgb_stats,row_pooled,axial,"
             "axial_stats,conv_axial,conv_axial_stats,axial_tokenconv_k5,"
             "axial_tokenconv_k9,axial_patchmlp_p4,axial_patchmlp_p8,"
-            "axial_gated_mixer,axial_tokenconv_gated,axial_query_pool"
+            "axial_gated_mixer,axial_tokenconv_gated,axial_query_pool,"
+            "axial_convpatch_p4,axial_convpatch_p8,axial_moment_tokens,"
+            "axial_global_latents,axial_bilinear_mixer,axial_llmish"
         ),
     )
     return parser.parse_args()
@@ -703,6 +713,72 @@ def main() -> None:
             "axial_query_pool",
             AxialClassifier,
             {**axial_common, "pooling": "query"},
+        ),
+        (
+            "axial_convpatch_p4",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 4,
+                "tokenizer": "conv_patch_mlp",
+                "tokenizer_kernel_size": 5,
+            },
+        ),
+        (
+            "axial_convpatch_p8",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "conv_patch_mlp",
+                "tokenizer_kernel_size": 5,
+            },
+        ),
+        (
+            "axial_moment_tokens",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 4,
+                "tokenizer": "patch_mlp",
+                "use_moment_tokens": True,
+            },
+        ),
+        (
+            "axial_global_latents",
+            AxialClassifier,
+            {**axial_common, "num_global_tokens": 4, "pooling": "latent_mean"},
+        ),
+        (
+            "axial_axis_patches",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "conv_patch_mlp",
+                "tokenizer_kernel_size": 5,
+                "use_axis_patch_tokens": True,
+                "feature_patch_size": 3,
+            },
+        ),
+        (
+            "axial_bilinear_mixer",
+            AxialClassifier,
+            {**axial_common, "mixer": "bilinear_feature"},
+        ),
+        (
+            "axial_llmish",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "conv_patch_mlp",
+                "tokenizer_kernel_size": 5,
+                "use_moment_tokens": True,
+                "num_global_tokens": 4,
+                "pooling": "latent_mean",
+                "mixer": "bilinear_feature",
+            },
         ),
         (
             "axial_stats",

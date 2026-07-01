@@ -264,6 +264,72 @@ def main() -> None:
             {**axial_common, "pooling": "query"},
         ),
         (
+            "axial_convpatch_p4",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 4,
+                "tokenizer": "conv_patch_mlp",
+                "tokenizer_kernel_size": 5,
+            },
+        ),
+        (
+            "axial_convpatch_p8",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "conv_patch_mlp",
+                "tokenizer_kernel_size": 5,
+            },
+        ),
+        (
+            "axial_moment_tokens",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 4,
+                "tokenizer": "patch_mlp",
+                "use_moment_tokens": True,
+            },
+        ),
+        (
+            "axial_global_latents",
+            AxialClassifier,
+            {**axial_common, "num_global_tokens": 4, "pooling": "latent_mean"},
+        ),
+        (
+            "axial_axis_patches",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "conv_patch_mlp",
+                "tokenizer_kernel_size": 5,
+                "use_axis_patch_tokens": True,
+                "feature_patch_size": 4,
+            },
+        ),
+        (
+            "axial_bilinear_mixer",
+            AxialClassifier,
+            {**axial_common, "mixer": "bilinear_feature"},
+        ),
+        (
+            "axial_llmish",
+            AxialClassifier,
+            {
+                **common,
+                "time_patch_len": 8,
+                "tokenizer": "conv_patch_mlp",
+                "tokenizer_kernel_size": 5,
+                "use_moment_tokens": True,
+                "num_global_tokens": 4,
+                "pooling": "latent_mean",
+                "mixer": "bilinear_feature",
+            },
+        ),
+        (
             "axial_stats",
             AxialStatsClassifier,
             {**axial_common, "stats_dim": train[2].shape[1]},
