@@ -1,6 +1,7 @@
 # Axial Time-Series Future Tests
 
-Status after commit `9e9ed2c` (`Add axial time-series benchmark sweeps`).
+Status after the raw-XGBoost control sweep in
+`logs/uea_sweep_rawflat_core/summary.csv`.
 
 ## Current Readout
 
@@ -9,8 +10,13 @@ Across HAR plus a five-dataset UEA sweep:
 
 - Row-pooled temporal transformers are retired. They consistently underperform and
   should not be included in future sweeps unless needed as a historical control.
+- Add `xgb_raw_flat` to every forward-looking sweep. This is XGBoost over the
+  flattened raw window only, with no lag, rolling, or summary variables. It is the
+  clean tree baseline for "no pandas/SQL feature engineering."
 - Axial and conv-axial models extract real signal from raw multivariate windows.
-- A well-engineered XGBoost over window statistics remains the practical bar.
+- A well-engineered XGBoost over window statistics remains the practical bar,
+  but raw flattened XGBoost is the better automatic/no-feature-engineering
+  baseline.
 - Stats-assisted axial often matches or beats XGBoost, which means the backbone can
   use the relevant information when it is exposed.
 - Raw axial still trails stats-assisted axial on several datasets, so the raw
@@ -18,15 +24,15 @@ Across HAR plus a five-dataset UEA sweep:
 
 ## Benchmark Summary
 
-Three-seed macro-F1 means from `logs/uea_sweep_core/summary.csv`:
+Three-seed macro-F1 means from `logs/uea_sweep_rawflat_core/summary.csv`:
 
-| Dataset | XGB+stats | Axial | Conv-axial | Axial+stats | Conv-axial+stats |
-|---|---:|---:|---:|---:|---:|
-| ArticularyWordRecognition | 0.867 | 0.429 | 0.827 | 0.942 | 0.929 |
-| BasicMotions | 0.932 | 0.905 | 0.886 | 0.857 | 0.866 |
-| Epilepsy | 0.962 | 0.923 | 0.920 | 0.944 | 0.946 |
-| NATOPS | 0.842 | 0.707 | 0.773 | 0.912 | 0.883 |
-| RacketSports | 0.794 | 0.762 | 0.799 | 0.765 | 0.724 |
+| Dataset | XGB raw | XGB+stats | Axial | Conv-axial | Axial+stats | Conv-axial+stats |
+|---|---:|---:|---:|---:|---:|---:|
+| ArticularyWordRecognition | 0.805 | 0.867 | 0.429 | 0.827 | 0.942 | 0.929 |
+| BasicMotions | 0.778 | 0.932 | 0.905 | 0.886 | 0.857 | 0.866 |
+| Epilepsy | 0.723 | 0.962 | 0.923 | 0.920 | 0.944 | 0.946 |
+| NATOPS | 0.813 | 0.842 | 0.707 | 0.773 | 0.912 | 0.883 |
+| RacketSports | 0.833 | 0.794 | 0.762 | 0.799 | 0.765 | 0.724 |
 
 HAR three-seed macro-F1:
 
@@ -37,6 +43,11 @@ HAR three-seed macro-F1:
 | Conv-axial | 0.858 |
 | Axial+stats | 0.888 |
 | Conv-axial+stats | 0.887 |
+
+Summary tables should include both XGB controls:
+
+- `xgb_raw_flat`: raw flattened values only; no feature engineering.
+- `xgb_stats`: engineered window summary variables; practical expert baseline.
 
 ## Working Hypothesis
 

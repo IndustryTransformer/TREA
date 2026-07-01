@@ -4,10 +4,11 @@ HAR is a better quick time-series test than the NOx rows: each sample is a
 9-channel, 128-step phone accelerometer/gyroscope window, and the official split
 separates train/test subjects. We compare:
 
-  xgb_stats    XGBoost on engineered window statistics
-  row_pooled   feature-mean pooled temporal transformer
-  axial        axial feature/time transformer over raw windows
-  axial_stats  axial plus the same engineered statistics
+  xgb_raw_flat     XGBoost on flattened raw window values, no summaries/lags
+  xgb_stats        XGBoost on engineered window statistics
+  row_pooled       retired historical control; feature-mean pooled transformer
+  axial            axial feature/time transformer over raw windows
+  axial_stats      axial plus the same engineered statistics
 
 Usage:
     uv run python examples/benchmark_har_axial.py --epochs 8 --device cpu
@@ -500,6 +501,36 @@ def xgb_stats_baseline(
     )
 
 
+def xgb_raw_flat_baseline(
+    train: tuple[np.ndarray, np.ndarray, np.ndarray],
+    test: tuple[np.ndarray, np.ndarray, np.ndarray],
+    num_classes: int,
+    args: argparse.Namespace,
+) -> Metrics:
+    x_train, y_train, _s_train = train
+    x_test, y_test, _s_test = test
+    X_train = np.nan_to_num(x_train, nan=0.0).reshape(len(y_train), -1)
+    X_test = np.nan_to_num(x_test, nan=0.0).reshape(len(y_test), -1)
+    model = XGBClassifier(
+        n_estimators=args.xgb_estimators,
+        max_depth=args.xgb_max_depth,
+        learning_rate=args.xgb_lr,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        objective="multi:softprob",
+        eval_metric="mlogloss",
+        n_jobs=args.xgb_jobs,
+        random_state=args.seed,
+    )
+    model.fit(X_train, y_train)
+    pred = torch.from_numpy(model.predict(X_test).astype(np.int64))
+    target = torch.from_numpy(y_test)
+    return Metrics(
+        accuracy=float((pred == target).float().mean().item()),
+        macro_f1=macro_f1(pred, target, num_classes),
+    )
+
+
 def train_one(
     name: str,
     model: nn.Module,
@@ -582,10 +613,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--models",
         type=str,
-        default="xgb_stats,row_pooled,axial,axial_stats",
+        default="xgb_raw_flat,xgb_stats,axial,axial_stats",
         help=(
-            "Comma-separated subset: xgb_stats,row_pooled,axial,axial_stats,"
-            "conv_axial,conv_axial_stats"
+            "Comma-separated subset: xgb_raw_flat,xgb_stats,row_pooled,axial,"
+            "axial_stats,conv_axial,conv_axial_stats"
         ),
     )
     return parser.parse_args()
@@ -637,6 +668,14 @@ def main() -> None:
 
     selected = {m.strip() for m in args.models.split(",") if m.strip()}
     results = {}
+    if "xgb_raw_flat" in selected:
+        xgb_raw = xgb_raw_flat_baseline(train, test, num_classes, args)
+        results["xgb_raw_flat"] = asdict(xgb_raw)
+        print(
+            f"{'xgb_raw_flat':<12} test_acc={xgb_raw.accuracy:.3f} "
+            f"test_f1={xgb_raw.macro_f1:.3f}",
+            flush=True,
+        )
     if "xgb_stats" in selected:
         xgb = xgb_stats_baseline(train, test, num_classes, args)
         results["xgb_stats"] = asdict(xgb)

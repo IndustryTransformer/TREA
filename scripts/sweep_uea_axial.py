@@ -26,7 +26,9 @@ DEFAULT_DATASETS = [
     "NATOPS",
     "ArticularyWordRecognition",
 ]
-DEFAULT_MODELS = "xgb_stats,row_pooled,axial,axial_stats,conv_axial,conv_axial_stats"
+DEFAULT_MODELS = (
+    "xgb_raw_flat,xgb_stats,axial,axial_stats,conv_axial,conv_axial_stats"
+)
 
 
 def run_one(args: argparse.Namespace, dataset: str, seed: int, output: Path) -> None:

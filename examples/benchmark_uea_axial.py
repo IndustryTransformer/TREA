@@ -3,8 +3,9 @@
 Downloads a dataset from the time-series classification archive, parses the UEA
 ``.ts`` files, and runs the same comparison as the HAR benchmark:
 
+  xgb_raw_flat      XGBoost on flattened raw values, no summaries/lags
   xgb_stats         XGBoost on engineered window statistics
-  row_pooled        feature-mean pooled temporal transformer
+  row_pooled        retired historical control; feature-mean pooled transformer
   axial             axial feature/time transformer over raw windows
   axial_stats       axial plus engineered stats
   conv_axial        depthwise temporal conv stem + axial
@@ -43,6 +44,7 @@ from examples.benchmark_har_axial import (  # noqa: E402
     standardize_stats,
     train_one,
     window_stats,
+    xgb_raw_flat_baseline,
     xgb_stats_baseline,
 )
 
@@ -184,7 +186,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--models",
         type=str,
-        default="xgb_stats,row_pooled,axial,axial_stats,conv_axial,conv_axial_stats",
+        default=(
+            "xgb_raw_flat,xgb_stats,axial,axial_stats,conv_axial,"
+            "conv_axial_stats"
+        ),
     )
     return parser.parse_args()
 
@@ -232,6 +237,14 @@ def main() -> None:
     selected = {m.strip() for m in args.models.split(",") if m.strip()}
 
     results = {}
+    if "xgb_raw_flat" in selected:
+        xgb_raw = xgb_raw_flat_baseline(train, test, num_classes, args)
+        results["xgb_raw_flat"] = asdict(xgb_raw)
+        print(
+            f"{'xgb_raw_flat':<16} test_acc={xgb_raw.accuracy:.3f} "
+            f"test_f1={xgb_raw.macro_f1:.3f}",
+            flush=True,
+        )
     if "xgb_stats" in selected:
         xgb = xgb_stats_baseline(train, test, num_classes, args)
         results["xgb_stats"] = asdict(xgb)
