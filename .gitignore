@@ -23,3 +23,7 @@ etth1_model_comparison.csv
 cache/
 .ruff_cache/
 .claude/
+
+# generated run artifacts (results + logs at repo root; reproducible)
+/*_results.json
+/*_run.log
