@@ -5,7 +5,8 @@ Status after the raw-XGBoost control sweep in
 screen in `logs/uea_sweep_nonlinear_core/summary.csv`. Newer interaction and
 axis-patch screens are logged in `logs/uea_sweep_wild_core/summary.csv` and
 `logs/uea_sweep_axis_patches/summary.csv`. The first conv-stem combination screen
-is logged in `logs/uea_sweep_conv_combo/summary.csv`.
+is logged in `logs/uea_sweep_conv_combo/summary.csv`. A medium-capacity stress
+check is logged in `logs/uea_sweep_conv_combo_medium/summary.csv`.
 
 ## Current Readout
 
@@ -39,6 +40,9 @@ Across HAR plus a five-dataset UEA sweep:
   `conv_axial_axis_global` beats XGB+stats on ArticularyWordRecognition, while
   `conv_axial_axis_patches` and `conv_axial_global_latents` beat XGB+stats on
   BasicMotions. NATOPS remains unsolved.
+- Scaling from `d_model=32`, 2 layers to `d_model=64`, 4 layers improves the
+  Articulary conv-combo route and exposes capacity as a NATOPS bottleneck, but
+  NATOPS still needs a different treatment.
 
 ## Benchmark Summary
 
@@ -174,6 +178,30 @@ Readout:
 - The fixed `axis+global` combination is not generally stable. The better version
   is likely a learned gate/router over raw, axis-patch, and global-latent streams.
 
+## Medium-Capacity Screen
+
+Three-seed macro-F1 means from
+`logs/uea_sweep_conv_combo_medium/summary.csv`. This used `d_model=64`, 4 layers,
+4 heads, and the same 60-epoch schedule.
+
+| Dataset | XGB raw | XGB+stats | Conv-axial | Conv axis | Conv axis+global |
+|---|---:|---:|---:|---:|---:|
+| ArticularyWordRecognition | 0.805 | 0.867 | 0.837 | 0.856 | 0.876 |
+| NATOPS | 0.813 | 0.842 | 0.794 | 0.708 | 0.696 |
+
+Readout:
+
+- Medium `conv_axial_axis_global` beats XGB+stats on ArticularyWordRecognition and
+  improves over medium plain conv. This supports the scale-with-data hypothesis for
+  longer/many-class sequence datasets.
+- Medium `conv_axial` briefly beats XGB+stats on one NATOPS seed, but the average
+  still trails raw XGB and XGB+stats. The variance is high.
+- Axis/global tokens hurt NATOPS at medium size. For NATOPS, treat extra summary
+  tokens as harmful until a gate/router or pretraining says otherwise.
+- Larger models should be paired with stronger data: public multi-dataset
+  pretraining, synthetic simulation windows, or both. Scaling on the current tiny
+  supervised splits alone is too noisy.
+
 ## Working Hypothesis
 
 Attention is learning useful feature/time routing, but the raw cell token is too weak.
@@ -249,9 +277,12 @@ Prioritize tests that reduce the `raw model -> stats-assisted model` gap.
    - `scripts/sweep_uea_axial.py` now exposes `--d-model`, `--n-head`,
      `--num-layers`, and `--dropout`, so medium screens can be launched without
      editing code.
-   - First medium check: ArticularyWordRecognition and NATOPS with
-     `d_model=64`, 4 layers, comparing `conv_axial`,
-     `conv_axial_axis_patches`, and `conv_axial_axis_global`.
+   - First medium check completed. Keep medium `conv_axial_axis_global` for
+     Articulary-like datasets; keep medium plain `conv_axial` for NATOPS-like
+     datasets until a learned router exists.
+   - Next scale step should not be another supervised-only size bump. It should be
+     masked/pretext pretraining across many UEA datasets and generated simulation
+     windows, followed by the same five-dataset fine-tune battery.
 
 ## Success Criteria
 
