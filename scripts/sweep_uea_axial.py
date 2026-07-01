@@ -19,12 +19,16 @@ from pathlib import Path
 from statistics import mean, pstdev
 
 
+# The 20 parser-compatible UEA multivariate datasets from data/uea (see
+# scripts/download_uea_archive.py), ordered roughly cheap -> expensive so partial
+# sweeps cover the small ones first. Per-(dataset, seed) checkpointing makes it
+# resumable; subset with --datasets for a quick pass.
 DEFAULT_DATASETS = [
-    "BasicMotions",
-    "Epilepsy",
-    "RacketSports",
-    "NATOPS",
-    "ArticularyWordRecognition",
+    "RacketSports", "ERing", "Libras", "BasicMotions", "PenDigits",
+    "NATOPS", "Epilepsy", "ArticularyWordRecognition", "Handwriting",
+    "UWaveGestureLibrary", "FingerMovements", "HandMovementDirection", "LSST",
+    "AtrialFibrillation", "Heartbeat", "Cricket", "SelfRegulationSCP1",
+    "SelfRegulationSCP2", "EthanolConcentration", "StandWalkJump",
 ]
 DEFAULT_MODELS = (
     "xgb_raw_flat,xgb_stats,axial,axial_stats,conv_axial,conv_axial_stats"
