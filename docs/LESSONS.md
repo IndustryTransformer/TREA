@@ -87,6 +87,31 @@ places the new column near related ones via text). The same-schema arena favors 
 by construction (index just relearns 9 known columns from B's labels). The disjoint-column
 test is the decisive follow-up; pre-register a fresh criterion before running it.
 
+### 3b. Multi-schema scaling — semantic mechanism VALIDATED (2026-06-30)
+
+The follow-up the pair test pointed to: semantic column transfer is a *meta-learning* bet
+that needs schema *diversity*, so test whether transfer to a held-out dataset improves
+when pretraining across K source schemas. Corpus = 15 diverse OpenML/sklearn regression
+sets with meaningful column names (`scripts/download_tabular_corpus.py`); one shared
+encoder pretrained on K sources, few-shot (n=200) transfer to a held-out dataset with
+unseen columns (`scripts/schema_scaling.py`). Pre-registered: VALID iff transfer_semantic
+(1) improves with K, (2) < transfer_index at max K, (3) < scratch_semantic.
+
+**Result: 5/5 held-out datasets pass all three.** transfer_semantic beats the index
+vocab-floor by large margins (index collapses unseen columns to `[UNK]` → flat, *worse
+than scratch*; semantic is the only way to give a never-seen column a working identity)
+and beats from-scratch on every dataset. This validates the semantic-column mechanism —
+the cross-schema capability trees structurally lack — which the same-schema pair (§3a)
+could not reach.
+
+**Two honest caveats.** (1) The benefit **saturates by K≈2–4**; it is *not* a clean
+monotone scaling law (california is best at K=4 then regresses; some slopes are within
+noise). Claim: "pretraining on a few diverse schemas helps via column semantics," not
+"monotone in K." (2) **XGB is still the absolute bar on 4/5** (abalone is the lone deep
+win, transfer_semantic 2.37 < XGB 2.47). So this validates the *mechanism* (README pillar
+2: cross-dataset transfer), not "deep beats trees." Next: does the semantic edge scale
+with corpus size/diversity beyond K≈4, and does it hold with MTM (unlabeled) pretraining?
+
 ## 4. Architecture decisions (from the attention analysis)
 
 - **Bottleneck:** the row encoder mean-pools features to one vector per timestep, so the
