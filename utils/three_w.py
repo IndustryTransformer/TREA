@@ -178,7 +178,7 @@ class ThreeWDataset(Dataset):
             well_of = np.array(
                 [
                     (
-                        m.group(1)
+                        m.group(0)
                         if (m := _re.search(r"WELL-\d+", str(p)))
                         else f"sim-{i}"
                     )

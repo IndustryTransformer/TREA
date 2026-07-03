@@ -437,7 +437,11 @@ def run_rf_baseline(
     train_seconds = time.perf_counter() - t0
 
     pred = clf.predict(x_val)
-    score = clf.predict_proba(x_val)[:, 1]
+    proba = clf.predict_proba(x_val)
+    classes = list(clf.classes_)
+    score = (
+        proba[:, classes.index(1)] if 1 in classes else np.zeros(len(x_val))
+    )
     metrics = binary_metrics(pred, y_val, score)
     metrics["train_seconds"] = train_seconds
     metrics["num_params"] = 0
