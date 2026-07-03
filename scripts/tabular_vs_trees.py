@@ -285,14 +285,13 @@ def main():
     ap.add_argument("--label-smoothing", type=float, default=0.0)
     ap.add_argument("--logit-adjustment-tau", type=float, default=1.0)
     ap.add_argument("--warmup-frac", type=float, default=0.05)
-    ap.add_argument("--ensemble-k", type=int, default=0)
-    ap.add_argument("--smoke", action="store_true")
     ap.add_argument(
         "--ensemble-k",
         type=int,
         default=0,
         help="TabM-mini BatchEnsemble members (0=off; 32 recommended).",
     )
+    ap.add_argument("--smoke", action="store_true")
     a = ap.parse_args()
     epochs, patience = (3, 2) if a.smoke else (100, 16)
     if a.smoke:
