@@ -148,7 +148,11 @@ def deep_score(
         )
     ckdir = Path(os.environ.get("TMPDIR", "/tmp")) / f"tvt_{seed}"
     trainer, ckpt = build_trainer(
-        max_epochs=epochs, patience=patience, ckpt_dir=str(ckdir)
+        max_epochs=epochs,
+        patience=patience,
+        ckpt_dir=str(ckdir),
+        monitor="val_macro_f1" if task == "classification" else "val_loss",
+        mode="max" if task == "classification" else "min",
     )
     trainer.fit(
         model,
@@ -228,7 +232,7 @@ def main():
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--smoke", action="store_true")
     a = ap.parse_args()
-    epochs, patience = (3, 2) if a.smoke else (100, 8)
+    epochs, patience = (3, 2) if a.smoke else (100, 16)
     if a.smoke:
         a.seeds = 2
 
