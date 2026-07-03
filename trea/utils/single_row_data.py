@@ -10,6 +10,7 @@ Differences from the Hephaestus original: no BERT/`transformers` dependency, and
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -39,6 +40,7 @@ class SingleRowConfig:
     n_cat_cols: int
     n_columns: int
     target: str | None = None
+    numeric_quantiles: torch.Tensor | None = None
 
     @classmethod
     def generate(cls, df: pd.DataFrame, target: str | None = None) -> "SingleRowConfig":
@@ -53,6 +55,19 @@ class SingleRowConfig:
 
         tokens = SPECIAL_TOKENS + numeric_cols + object_tokens + cat_cols
         token_dict = {t: i for i, t in enumerate(tokens)}
+
+        quantiles = None
+        if numeric_cols:
+            q = np.linspace(0, 1, 65)
+            q_arr = []
+            for c in numeric_cols:
+                vals = df[c].dropna()
+                if len(vals) > 0:
+                    q_arr.append(np.quantile(vals, q))
+                else:
+                    q_arr.append(np.zeros_like(q))
+            quantiles = torch.tensor(np.stack(q_arr), dtype=torch.float32)
+
         return cls(
             tokens=tokens,
             token_dict=token_dict,
@@ -64,6 +79,7 @@ class SingleRowConfig:
             n_cat_cols=len(cat_cols),
             n_columns=len(numeric_cols) + len(cat_cols),
             target=target,
+            numeric_quantiles=quantiles,
         )
 
 

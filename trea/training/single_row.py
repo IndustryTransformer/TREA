@@ -159,6 +159,8 @@ class SingleRowRegressor(L.LightningModule):
         hl_gauss_sigma_bins: float = 2.0,
         bin_spacing: str = "uniform",
         symlog: bool = False,
+        value_encoder: str = "identity",
+        fusion: str = "additive",
         weight_decay: float = 1e-2,
         warmup_steps: int = 0,
     ):
@@ -177,6 +179,8 @@ class SingleRowRegressor(L.LightningModule):
             col_embedder,
             column_descriptions,
             output_dim=output_dim,
+            value_encoder=value_encoder,
+            fusion=fusion,
         )
         if head == "hl_gauss":
             if y_train is None:
@@ -246,14 +250,16 @@ class SingleRowClassifier(L.LightningModule):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
-        class_priors=None,
+        value_encoder: str = "identity",
+        fusion: str = "additive",
+        class_priors: torch.Tensor | list[float] | None = None,
         logit_adjust_tau: float = 1.0,
         label_smoothing: float = 0.05,
         weight_decay: float = 1e-2,
         warmup_steps: int = 0,
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=["config", "col_embedder"])
+        self.save_hyperparameters(ignore=["config", "col_embedder", "class_priors"])
         self.lr = lr
         self.weight_decay = weight_decay
         self.warmup_steps = warmup_steps
@@ -267,6 +273,8 @@ class SingleRowClassifier(L.LightningModule):
             dropout,
             col_embedder,
             column_descriptions,
+            value_encoder=value_encoder,
+            fusion=fusion,
         )
         self.loss_fn = LogitAdjustedCrossEntropy(
             class_priors=class_priors,

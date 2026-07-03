@@ -133,11 +133,16 @@ class TabularEncoder(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        value_encoder="identity",
+        fusion="additive",
     ):
         super().__init__()
+        self.config = config
         self.d_model = d_model
-        self.n_numeric_cols = config.n_numeric_cols
         self.n_cat_cols = config.n_cat_cols
+        self.n_numeric_cols = config.n_numeric_cols
+        self.value_encoder = value_encoder
+        self.fusion = fusion
 
         self.embeddings = nn.Embedding(config.n_tokens, d_model)
         self.register_buffer(
@@ -162,21 +167,31 @@ class TabularEncoder(nn.Module):
             ),
         )
 
-        # Optional name-keyed column-identity embedder (semantic transfer). When set,
-        # it supplies the per-column identity vectors keyed by column *name*. The
-        # internal `embeddings` table still serves categorical value tokens (not names).
-        # `column_descriptions` maps a raw column token -> the text actually embedded;
-        # feed descriptions, not terse codes (see column_embeddings.py).
         self.col_embedder = col_embedder
         descr = column_descriptions or {}
         self.col_texts = [descr.get(c, c) for c in col_tokens]
         self.numeric_texts = [descr.get(c, c) for c in config.numeric_col_tokens]
 
-        # Numeric value encoder: project [value, present_flag] into d_model with a
-        # shared dense layer, then ADD the column identity. Never scale the identity
-        # vector by the scalar value -- that collapses to 0 at value 0 (identity lost)
-        # and is scale-sensitive. Shared across columns => transfers across schemas.
-        self.num_value_proj = nn.Linear(2, d_model)
+        if self.value_encoder == "dual":
+            self.n_bins = 64
+            self.ple_bank = nn.Embedding(self.n_bins, d_model)
+            self.periodic_freqs = nn.Parameter(torch.randn(16))
+            self.periodic_bias = nn.Parameter(torch.randn(16))
+            self.num_value_proj = nn.Linear(2 + d_model + 16, d_model)
+            self.missing_vector = nn.Parameter(torch.zeros(d_model + 16))
+            qs = (
+                config.numeric_quantiles
+                if getattr(config, "numeric_quantiles", None) is not None
+                else torch.zeros(config.n_numeric_cols, 65)
+            )
+            self.register_buffer("numeric_quantiles", qs)
+        else:
+            self.num_value_proj = nn.Linear(2, d_model)
+
+        if self.fusion == "hadamard":
+            self.fusion_mlp = nn.Sequential(
+                nn.Linear(d_model, d_model), nn.ReLU(), nn.Linear(d_model, d_model)
+            )
 
         self.layers = nn.ModuleList(
             [
@@ -198,15 +213,33 @@ class TabularEncoder(nn.Module):
         else:
             col_emb = self.embeddings(self.col_indices.unsqueeze(0).expand(b, -1))
 
-        # Numeric value token = column identity + dense projection of [value, present].
-        # Any NON-FINITE input is treated as MISSING: present=0, value 0.
-        # Missingness is learned by the projection and identity is never lost.
-        missing = ~torch.isfinite(num_inputs)  # [b, n_num]: NaN or inf -> missing
+        missing = ~torch.isfinite(num_inputs)
         present = (~missing).to(num_inputs.dtype)
         vals = torch.where(missing, torch.zeros_like(num_inputs), num_inputs)
-        value_vec = self.num_value_proj(
-            torch.stack([vals, present], dim=-1)
-        )  # [b, n_num, d]
+
+        if self.value_encoder == "dual":
+            continuous = torch.stack([vals, present], dim=-1)
+            # soft PLE
+            x_exp = vals.unsqueeze(-1)
+            qs = self.numeric_quantiles
+            widths = qs[:, 1:] - qs[:, :-1]
+            ple_v = torch.clamp(
+                (x_exp - qs[:, :-1]) / (widths + 1e-8), min=0.0, max=1.0
+            )
+            ple_emb = torch.matmul(ple_v, self.ple_bank.weight)
+            # periodic
+            freqs = self.periodic_freqs.view(1, 1, -1)
+            bias = self.periodic_bias.view(1, 1, -1)
+            periodic_emb = torch.cos(2 * math.pi * freqs * x_exp + bias)
+            # missing fallback
+            discrete = torch.cat([ple_emb, periodic_emb], dim=-1)
+            discrete = torch.where(
+                present.unsqueeze(-1).bool(), discrete, self.missing_vector
+            )
+            concat_all = torch.cat([continuous, discrete], dim=-1)
+            value_vec = self.num_value_proj(concat_all)
+        else:
+            value_vec = self.num_value_proj(torch.stack([vals, present], dim=-1))
 
         if self.col_embedder is not None:
             num_col_emb = (
@@ -216,7 +249,11 @@ class TabularEncoder(nn.Module):
             num_col_emb = self.embeddings(
                 self.numeric_indices.unsqueeze(0).expand(b, -1)
             )
-        base_numeric = num_col_emb + value_vec
+
+        if self.fusion == "hadamard":
+            base_numeric = num_col_emb * self.fusion_mlp(value_vec) + value_vec
+        else:
+            base_numeric = num_col_emb + value_vec
 
         if cat_inputs is not None and self.n_cat_cols > 0:
             cat_emb = self.embeddings(cat_inputs.long())
@@ -263,6 +300,8 @@ class TabularRegressor(nn.Module):
         col_embedder=None,
         column_descriptions=None,
         output_dim=1,
+        value_encoder="identity",
+        fusion="additive",
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -273,6 +312,8 @@ class TabularRegressor(nn.Module):
             dropout,
             col_embedder,
             column_descriptions,
+            value_encoder=value_encoder,
+            fusion=fusion,
         )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)
@@ -309,6 +350,8 @@ class TabularClassifier(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        value_encoder="identity",
+        fusion="additive",
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -319,6 +362,8 @@ class TabularClassifier(nn.Module):
             dropout,
             col_embedder,
             column_descriptions,
+            value_encoder=value_encoder,
+            fusion=fusion,
         )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)

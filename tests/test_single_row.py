@@ -7,7 +7,7 @@ import torch
 
 from torch.utils.data import DataLoader
 
-from trea.models.single_row import mask_tensor
+from trea.models.single_row import TabularEncoder, mask_tensor
 from trea.training.single_row import (
     HLGaussLoss,
     LogitAdjustedCrossEntropy,
@@ -286,3 +286,32 @@ def test_logit_adjustment_changes_loss():
         logits, target
     )
     assert adjusted != plain
+
+
+def test_dual_numeric_encoder():
+    df = _toy_df()
+    cfg = SingleRowConfig.generate(df, target="target")
+    model = TabularEncoder(
+        cfg,
+        d_model=32,
+        value_encoder="dual",
+        fusion="hadamard",
+    )
+    assert model.ple_bank.weight.shape == (64, 32)
+
+    # Check value=0 does not give a zero vector
+    num_inputs = torch.zeros(2, cfg.n_numeric_cols)
+    cat_inputs = None
+
+    # Missing cells (NaN)
+    num_missing = torch.full((2, cfg.n_numeric_cols), float("nan"))
+
+    out_zero = model(num_inputs, cat_inputs)
+    out_nan = model(num_missing, cat_inputs)
+
+    # Output vectors shouldn't be identical
+    assert not torch.allclose(out_zero, out_nan)
+
+    # Zero value doesn't equal zero vector in the base numeric embedding
+    # (Checking the internal projection if needed, but end output should suffice)
+    assert out_zero.abs().sum() > 1e-4

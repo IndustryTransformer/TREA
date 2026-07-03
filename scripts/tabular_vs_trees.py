@@ -113,6 +113,8 @@ def deep_score(
     head="mse",
     bin_spacing="uniform",
     symlog=False,
+    value_encoder="identity",
+    fusion="additive",
     label_smoothing=0.05,
     logit_adjust_tau=1.0,
     warmup_frac=0.1,
@@ -146,6 +148,8 @@ def deep_score(
             y_train=ytr[fit_i],
             bin_spacing=bin_spacing,
             symlog=symlog,
+            value_encoder=value_encoder,
+            fusion=fusion,
             warmup_steps=warmup_steps,
         )
         monitor, mode = "val_loss", "min"
@@ -159,6 +163,8 @@ def deep_score(
             n_heads=N_HEADS,
             n_layers=N_LAYERS,
             lr=LR,
+            value_encoder=value_encoder,
+            fusion=fusion,
             class_priors=priors,
             logit_adjust_tau=logit_adjust_tau,
             label_smoothing=label_smoothing,
@@ -253,6 +259,8 @@ def main():
     ap.add_argument("--head", choices=["mse", "hl_gauss"], default="mse")
     ap.add_argument("--bin-spacing", choices=["uniform", "quantile"], default="uniform")
     ap.add_argument("--symlog", action="store_true")
+    ap.add_argument("--value-encoder", choices=["identity", "dual"], default="identity")
+    ap.add_argument("--fusion", choices=["additive", "hadamard"], default="additive")
     ap.add_argument("--label-smoothing", type=float, default=0.05)
     ap.add_argument("--logit-adjust-tau", type=float, default=1.0)
     ap.add_argument("--warmup-frac", type=float, default=0.1)
@@ -301,6 +309,8 @@ def main():
                     head=a.head,
                     bin_spacing=a.bin_spacing,
                     symlog=a.symlog,
+                    value_encoder=a.value_encoder,
+                    fusion=a.fusion,
                     label_smoothing=a.label_smoothing,
                     logit_adjust_tau=a.logit_adjust_tau,
                     warmup_frac=a.warmup_frac,
