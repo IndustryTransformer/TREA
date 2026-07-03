@@ -94,21 +94,39 @@ class HLGaussLoss(nn.Module):
 
     def __init__(
         self,
+        y_train: torch.Tensor | list[float],
         n_bins: int = 100,
-        y_min: float = -4.0,
-        y_max: float = 4.0,
         sigma_bins: float = 2.0,
+        bin_spacing: str = "uniform",
+        symlog: bool = False,
     ):
         super().__init__()
         if n_bins < 2:
             raise ValueError("n_bins must be >= 2")
-        centers = torch.linspace(y_min, y_max, n_bins)
+        self.symlog = symlog
+        y_t = torch.as_tensor(y_train, dtype=torch.float32).view(-1)
+        if symlog:
+            y_t = torch.sign(y_t) * torch.log(torch.abs(y_t) + 1.0)
+
+        if bin_spacing == "quantile":
+            centers = torch.quantile(
+                y_t, torch.linspace(0, 1, n_bins, device=y_t.device)
+            )
+            width = float(centers[-1] - centers[0]) / max(1, n_bins - 1)
+        else:
+            y_min, y_max = y_t.min().item(), y_t.max().item()
+            width = (y_max - y_min) / max(1, n_bins - 1)
+            pad = 3 * sigma_bins * width
+            centers = torch.linspace(y_min - pad, y_max + pad, n_bins)
+            width = float(centers[-1] - centers[0]) / max(1, n_bins - 1)
+
         self.register_buffer("centers", centers)
-        width = float((y_max - y_min) / max(1, n_bins - 1))
-        self.sigma = max(1e-6, sigma_bins * width)
+        self.sigma = max(1e-6, float(sigma_bins * width))
 
     def target_distribution(self, target: torch.Tensor):
         y = target.view(-1, 1).to(self.centers.device)
+        if self.symlog:
+            y = torch.sign(y) * torch.log(torch.abs(y) + 1.0)
         weights = torch.exp(-0.5 * ((self.centers.view(1, -1) - y) / self.sigma) ** 2)
         return weights / weights.sum(dim=1, keepdim=True).clamp_min(1e-12)
 
@@ -118,7 +136,10 @@ class HLGaussLoss(nn.Module):
 
     def expected_value(self, logits: torch.Tensor):
         probs = F.softmax(logits, dim=1)
-        return torch.matmul(probs, self.centers.to(logits.device)).unsqueeze(-1)
+        val = torch.matmul(probs, self.centers.to(logits.device)).unsqueeze(-1)
+        if self.symlog:
+            val = torch.sign(val) * (torch.exp(torch.abs(val)) - 1.0)
+        return val
 
 
 class SingleRowRegressor(L.LightningModule):
@@ -132,10 +153,12 @@ class SingleRowRegressor(L.LightningModule):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
-        loss: str = "mse",
+        head: str = "mse",
+        y_train: torch.Tensor | list[float] | None = None,
         hl_gauss_bins: int = 100,
-        hl_gauss_min: float = -4.0,
-        hl_gauss_max: float = 4.0,
+        hl_gauss_sigma_bins: float = 2.0,
+        bin_spacing: str = "uniform",
+        symlog: bool = False,
         weight_decay: float = 1e-2,
         warmup_steps: int = 0,
     ):
@@ -144,7 +167,7 @@ class SingleRowRegressor(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.warmup_steps = warmup_steps
-        output_dim = hl_gauss_bins if loss == "hl_gauss" else 1
+        output_dim = hl_gauss_bins if head == "hl_gauss" else 1
         self.model = TabularRegressor(
             config,
             d_model,
@@ -155,11 +178,18 @@ class SingleRowRegressor(L.LightningModule):
             column_descriptions,
             output_dim=output_dim,
         )
-        self.loss_fn = (
-            HLGaussLoss(hl_gauss_bins, hl_gauss_min, hl_gauss_max)
-            if loss == "hl_gauss"
-            else nn.MSELoss()
-        )
+        if head == "hl_gauss":
+            if y_train is None:
+                raise ValueError("y_train is required for hl_gauss head")
+            self.loss_fn = HLGaussLoss(
+                y_train=y_train,
+                n_bins=hl_gauss_bins,
+                sigma_bins=hl_gauss_sigma_bins,
+                bin_spacing=bin_spacing,
+                symlog=symlog,
+            )
+        else:
+            self.loss_fn = nn.MSELoss()
 
     def forward(self, batch: InputsTarget):
         return self.model(batch.inputs.numeric, batch.inputs.categorical)

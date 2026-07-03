@@ -81,7 +81,8 @@ def test_hl_gauss_regressor_predicts_scalar_values():
         d_model=D_MODEL,
         n_heads=N_HEADS,
         n_layers=N_LAYERS,
-        loss="hl_gauss",
+        head="hl_gauss",
+        y_train=df["target"].values,
         hl_gauss_bins=17,
     )
     batch = next(iter(loader))
@@ -91,6 +92,55 @@ def test_hl_gauss_regressor_predicts_scalar_values():
     assert logits.shape == (16, 17)
     assert pred.shape == (16, 1)
     assert torch.isfinite(pred).all()
+
+
+def test_hl_gauss_vs_mse_performance():
+    L.seed_everything(42, verbose=False)
+    n = 300
+    x = torch.linspace(-3, 3, n).unsqueeze(1)
+    y_smooth = torch.sin(x * 2.0)
+    # Bimodal: split randomly between y_smooth and y_smooth + 5.0
+    y_bimodal = torch.where(torch.rand(n, 1) > 0.5, y_smooth, y_smooth + 5.0)
+
+    def train_and_eval(y_target, head):
+        df = pd.DataFrame(
+            {"feat": x.squeeze().numpy(), "target": y_target.squeeze().numpy()}
+        )
+        cfg = SingleRowConfig.generate(df, target="target")
+        ds = TabularDS(df, cfg)
+        loader = DataLoader(ds, batch_size=64, collate_fn=tabular_collate_fn)
+
+        model = SingleRowRegressor(
+            cfg,
+            d_model=32,
+            n_heads=2,
+            n_layers=2,
+            head=head,
+            y_train=df["target"].values if head == "hl_gauss" else None,
+            hl_gauss_bins=30,
+            lr=0.02,
+        )
+        trainer, _ = build_trainer(max_epochs=30, patience=None)
+        trainer.fit(model, train_dataloaders=loader)
+
+        model.eval()
+        with torch.no_grad():
+            preds = []
+            for b in loader:
+                preds.append(model.predict_value(b))
+            pred = torch.cat(preds, dim=0)
+        rmse = torch.sqrt(torch.mean((pred - y_target) ** 2)).item()
+        return rmse
+
+    rmse_mse_smooth = train_and_eval(y_smooth, "mse")
+    rmse_hl_smooth = train_and_eval(y_smooth, "hl_gauss")
+    # hl_gauss should be within 10% of mse, or better
+    assert rmse_hl_smooth < rmse_mse_smooth * 1.10
+
+    rmse_mse_bimodal = train_and_eval(y_bimodal, "mse")
+    rmse_hl_bimodal = train_and_eval(y_bimodal, "hl_gauss")
+    # hl_gauss should beat mse on bimodal
+    assert rmse_hl_bimodal < rmse_mse_bimodal
 
 
 def test_mtm_forward_and_transfer():

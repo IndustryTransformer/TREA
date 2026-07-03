@@ -110,7 +110,9 @@ def deep_score(
     seed,
     epochs=256,
     patience=None,
-    regression_loss="mse",
+    head="mse",
+    bin_spacing="uniform",
+    symlog=False,
     label_smoothing=0.05,
     logit_adjust_tau=1.0,
     warmup_frac=0.1,
@@ -134,16 +136,16 @@ def deep_score(
     warmup_steps = int(train_batches * epochs * warmup_frac)
 
     if task == "regression":
-        y_min, y_max = float(np.nanmin(ytr[fit_i])), float(np.nanmax(ytr[fit_i]))
         model = SingleRowRegressor(
             cfg,
             d_model=D_MODEL,
             n_heads=N_HEADS,
             n_layers=N_LAYERS,
             lr=LR,
-            loss=regression_loss,
-            hl_gauss_min=y_min,
-            hl_gauss_max=y_max,
+            head=head,
+            y_train=ytr[fit_i],
+            bin_spacing=bin_spacing,
+            symlog=symlog,
             warmup_steps=warmup_steps,
         )
         monitor, mode = "val_loss", "min"
@@ -248,7 +250,9 @@ def main():
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--epochs", type=int, default=256)
     ap.add_argument("--patience", type=int, default=None)
-    ap.add_argument("--regression-loss", choices=["mse", "hl_gauss"], default="mse")
+    ap.add_argument("--head", choices=["mse", "hl_gauss"], default="mse")
+    ap.add_argument("--bin-spacing", choices=["uniform", "quantile"], default="uniform")
+    ap.add_argument("--symlog", action="store_true")
     ap.add_argument("--label-smoothing", type=float, default=0.05)
     ap.add_argument("--logit-adjust-tau", type=float, default=1.0)
     ap.add_argument("--warmup-frac", type=float, default=0.1)
@@ -294,7 +298,9 @@ def main():
                     seed,
                     epochs,
                     patience,
-                    regression_loss=a.regression_loss,
+                    head=a.head,
+                    bin_spacing=a.bin_spacing,
+                    symlog=a.symlog,
                     label_smoothing=a.label_smoothing,
                     logit_adjust_tau=a.logit_adjust_tau,
                     warmup_frac=a.warmup_frac,
