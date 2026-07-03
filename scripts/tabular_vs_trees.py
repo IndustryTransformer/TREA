@@ -22,9 +22,12 @@ Run (trains many models; progress off):
 
 import argparse
 import json
+import logging
+import multiprocessing as mp
 import os
 import warnings
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -43,6 +46,9 @@ from xgboost import XGBClassifier, XGBRegressor
 warnings.filterwarnings("ignore")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 torch.set_float32_matmul_precision("medium")
+# Silence Lightning's per-fit device/dataloader chatter (one block per Trainer.fit).
+for _n in ("pytorch_lightning", "lightning.pytorch", "lightning"):
+    logging.getLogger(_n).setLevel(logging.ERROR)
 
 from trea.training.single_row import (  # noqa: E402
     SingleRowClassifier,
@@ -235,7 +241,7 @@ def deep_score(
     }
 
 
-def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed):
+def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed, n_jobs=-1):
     Xtr_i = np.nan_to_num(Xtr, nan=0.0)  # trees have no missing channel -> mean-impute
     Xte_i = np.nan_to_num(Xte, nan=0.0)
     if task == "regression":
@@ -246,11 +252,13 @@ def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed):
                 learning_rate=0.05,
                 subsample=0.8,
                 colsample_bytree=0.8,
-                n_jobs=-1,
+                n_jobs=n_jobs,
                 random_state=seed,
             )
             if kind == "xgb"
-            else RandomForestRegressor(n_estimators=300, n_jobs=-1, random_state=seed)
+            else RandomForestRegressor(
+                n_estimators=300, n_jobs=n_jobs, random_state=seed
+            )
         )
         m.fit(Xtr_i, ytr)
         return float(np.sqrt(mean_squared_error(yte, m.predict(Xte_i)))) * tscale
@@ -261,16 +269,110 @@ def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed):
             learning_rate=0.05,
             subsample=0.8,
             colsample_bytree=0.8,
-            n_jobs=-1,
+            n_jobs=n_jobs,
             random_state=seed,
         )
         if kind == "xgb"
         else RandomForestClassifier(
-            n_estimators=300, class_weight="balanced", n_jobs=-1, random_state=seed
+            n_estimators=300, class_weight="balanced", n_jobs=n_jobs, random_state=seed
         )
     )
     m.fit(Xtr_i, ytr)
     return float(f1_score(yte, m.predict(Xte_i), average="macro"))
+
+
+def _score_dataset(payload):
+    """Score one dataset (all seeds, deep + trees). Runs in a worker process.
+
+    Self-contained so ProcessPoolExecutor (spawn) can pickle + dispatch it: all
+    it needs are the picklable ``payload`` and this module's globals (re-imported
+    in the child). Returns ``(i, rec)`` on success, else ``(i, {"__skip__": msg})``
+    or ``(i, {"__fail__": msg})`` so the parent owns printing and the file writes.
+    """
+    i, m, cfg = payload
+    name, task, feat = m["name"], m["task"], m["feature_cols"]
+    try:
+        df = pd.read_parquet(CORPUS / f"{name}.parquet")
+    except Exception as e:
+        return i, {"__skip__": f"{name}: {e}"}
+    row = {"deep": [], "xgb": [], "rf": [], "seed_results": []}
+    try:
+        for seed in range(cfg["seeds"]):
+            Xtr, ytr, Xte, yte, tscale, nc = prep(df, feat, task, seed)
+            deep = deep_score(
+                Xtr,
+                ytr,
+                Xte,
+                yte,
+                feat,
+                task,
+                nc,
+                tscale,
+                seed,
+                cfg["epochs"],
+                cfg["patience"],
+                head=cfg["head"],
+                bin_spacing=cfg["bin_spacing"],
+                symlog=cfg["symlog"],
+                value_encoder=cfg["value_encoder"],
+                fusion=cfg["fusion"],
+                label_smoothing=cfg["label_smoothing"],
+                logit_adjustment_tau=cfg["logit_adjustment_tau"],
+                warmup_frac=cfg["warmup_frac"],
+                ensemble_k=cfg["ensemble_k"],
+            )
+            xgb = tree_score(
+                "xgb", Xtr, ytr, Xte, yte, task, tscale, seed, cfg["tree_jobs"]
+            )
+            rf = tree_score(
+                "rf", Xtr, ytr, Xte, yte, task, tscale, seed, cfg["tree_jobs"]
+            )
+            row["deep"].append(deep["score"])
+            row["xgb"].append(xgb)
+            row["rf"].append(rf)
+            row["seed_results"].append(
+                {
+                    "seed": seed,
+                    "deep": deep["score"],
+                    "xgb": xgb,
+                    "rf": rf,
+                    "collapsed": bool(deep.get("collapsed", False)),
+                    "prediction_entropy": deep.get("prediction_entropy"),
+                    "prediction_histogram": deep.get("prediction_histogram"),
+                }
+            )
+    except Exception as e:
+        return i, {"__fail__": f"{name} ({task}): {type(e).__name__} {str(e)[:50]}"}
+    rec = {
+        "name": name,
+        "task": task,
+        "n_rows": m["n_rows"],
+        "n_features": len(feat),
+    }
+    for k in ("deep", "xgb", "rf"):
+        rec[k], rec[k + "_std"] = float(np.mean(row[k])), float(np.std(row[k]))
+    rec["seed_results"] = row["seed_results"]
+    rec["collapsed"] = any(s["collapsed"] for s in row["seed_results"])
+    rec["collapsed_seeds"] = [s["seed"] for s in row["seed_results"] if s["collapsed"]]
+    return i, rec
+
+
+def _print_row(i, rec):
+    higher = rec["task"] == "classification"
+    best_tree = max(rec["xgb"], rec["rf"]) if higher else min(rec["xgb"], rec["rf"])
+    tie = (
+        (rec["deep"] >= best_tree - rec["deep_std"])
+        if higher
+        else (rec["deep"] <= best_tree + rec["deep_std"])
+    )
+    metric = "F1" if higher else "RMSE"
+    print(
+        f"[{i:>2}] {rec['name']:34s} {rec['task'][:3]} {metric} "
+        f"deep {rec['deep']:.3f}±{rec['deep_std']:.3f} "
+        f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} "
+        f"| {'TIE/WIN' if tie else 'loss'}",
+        flush=True,
+    )
 
 
 def main():
@@ -291,6 +393,13 @@ def main():
         default=0,
         help="TabM-mini BatchEnsemble members (0=off; 32 recommended).",
     )
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Parallel dataset workers sharing the GPU (1=serial). The tiny models "
+        "leave the GPU ~90%% idle; 6-8 workers usually gives a near-linear speedup.",
+    )
     ap.add_argument("--smoke", action="store_true")
     a = ap.parse_args()
     epochs, patience = (3, 2) if a.smoke else (100, 16)
@@ -303,99 +412,64 @@ def main():
         for t in a.tasks:
             pick += [m for m in datasets if m["task"] == t][:2]
         datasets = pick
+    # Cap tree threads so W GPU-sharing workers don't oversubscribe the CPUs.
+    cpu = os.cpu_count() or 1
+    tree_jobs = -1 if a.workers <= 1 else max(1, cpu // a.workers)
     print(
         f"datasets={len(datasets)} | tasks={a.tasks} | seeds={a.seeds} | "
-        f"ensemble_k={a.ensemble_k} | device="
+        f"ensemble_k={a.ensemble_k} | workers={a.workers} | device="
         f"{'cuda' if torch.cuda.is_available() else 'cpu'}",
         flush=True,
     )
 
-    results = []
-    for i, m in enumerate(datasets):
-        name, task, feat = m["name"], m["task"], m["feature_cols"]
-        try:
-            df = pd.read_parquet(CORPUS / f"{name}.parquet")
-        except Exception as e:
-            print(f"[{i}] SKIP {name}: {e}", flush=True)
-            continue
-        row = {"deep": [], "xgb": [], "rf": [], "seed_results": []}
-        try:
-            for seed in range(a.seeds):
-                Xtr, ytr, Xte, yte, tscale, nc = prep(df, feat, task, seed)
-                deep = deep_score(
-                    Xtr,
-                    ytr,
-                    Xte,
-                    yte,
-                    feat,
-                    task,
-                    nc,
-                    tscale,
-                    seed,
-                    epochs,
-                    patience,
-                    head=a.head,
-                    bin_spacing=a.bin_spacing,
-                    symlog=a.symlog,
-                    value_encoder=a.value_encoder,
-                    fusion=a.fusion,
-                    label_smoothing=a.label_smoothing,
-                    logit_adjustment_tau=a.logit_adjustment_tau,
-                    warmup_frac=a.warmup_frac,
-                    ensemble_k=a.ensemble_k,
-                )
-                xgb = tree_score("xgb", Xtr, ytr, Xte, yte, task, tscale, seed)
-                rf = tree_score("rf", Xtr, ytr, Xte, yte, task, tscale, seed)
-                row["deep"].append(deep["score"])
-                row["xgb"].append(xgb)
-                row["rf"].append(rf)
-                row["seed_results"].append(
-                    {
-                        "seed": seed,
-                        "deep": deep["score"],
-                        "xgb": xgb,
-                        "rf": rf,
-                        "collapsed": bool(deep.get("collapsed", False)),
-                        "prediction_entropy": deep.get("prediction_entropy"),
-                        "prediction_histogram": deep.get("prediction_histogram"),
-                    }
-                )
-        except Exception as e:
-            print(
-                f"[{i}] FAIL {name} ({task}): {type(e).__name__} {str(e)[:50]}",
-                flush=True,
-            )
-            continue
-        rec = {
-            "name": name,
-            "task": task,
-            "n_rows": m["n_rows"],
-            "n_features": len(feat),
-        }
-        for k in ("deep", "xgb", "rf"):
-            rec[k], rec[k + "_std"] = float(np.mean(row[k])), float(np.std(row[k]))
-        rec["seed_results"] = row["seed_results"]
-        rec["collapsed"] = any(s["collapsed"] for s in row["seed_results"])
-        rec["collapsed_seeds"] = [
-            s["seed"] for s in row["seed_results"] if s["collapsed"]
-        ]
-        results.append(rec)
-        RESULTS.write_text(json.dumps(results, indent=2))
-        higher = task == "classification"
-        best_tree = max(rec["xgb"], rec["rf"]) if higher else min(rec["xgb"], rec["rf"])
-        tie = (
-            (rec["deep"] >= best_tree - rec["deep_std"])
-            if higher
-            else (rec["deep"] <= best_tree + rec["deep_std"])
+    cfg = {
+        "seeds": a.seeds,
+        "epochs": epochs,
+        "patience": patience,
+        "head": a.head,
+        "bin_spacing": a.bin_spacing,
+        "symlog": a.symlog,
+        "value_encoder": a.value_encoder,
+        "fusion": a.fusion,
+        "label_smoothing": a.label_smoothing,
+        "logit_adjustment_tau": a.logit_adjustment_tau,
+        "warmup_frac": a.warmup_frac,
+        "ensemble_k": a.ensemble_k,
+        "tree_jobs": tree_jobs,
+    }
+    payloads = [(i, m, cfg) for i, m in enumerate(datasets)]
+    by_index = {}
+
+    def _emit(i, res):
+        if "__skip__" in res:
+            print(f"[{i}] SKIP {res['__skip__']}", flush=True)
+            return
+        if "__fail__" in res:
+            print(f"[{i}] FAIL {res['__fail__']}", flush=True)
+            return
+        by_index[i] = res
+        _print_row(i, res)
+        # Write in original dataset order regardless of completion order.
+        RESULTS.write_text(
+            json.dumps([by_index[j] for j in sorted(by_index)], indent=2)
         )
-        metric = "F1" if higher else "RMSE"
-        print(
-            f"[{i:>2}] {name:34s} {task[:3]} {metric} "
-            f"deep {rec['deep']:.3f}±{rec['deep_std']:.3f} "
-            f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} "
-            f"| {'TIE/WIN' if tie else 'loss'}",
-            flush=True,
-        )
+
+    if a.workers <= 1:
+        for p in payloads:
+            i, res = _score_dataset(p)
+            _emit(i, res)
+    else:
+        # Separate processes (not threads): the GIL + Lightning's Trainer make
+        # threads useless here; spawned procs each get a CUDA context and the
+        # driver time-slices the underused GPU across them.
+        ctx = mp.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=a.workers, mp_context=ctx) as ex:
+            futures = [ex.submit(_score_dataset, p) for p in payloads]
+            for fut in as_completed(futures):
+                i, res = fut.result()
+                _emit(i, res)
+
+    results = [by_index[j] for j in sorted(by_index)]
 
     # ---- aggregate ----
     print(
