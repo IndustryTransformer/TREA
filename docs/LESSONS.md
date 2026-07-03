@@ -166,6 +166,19 @@ further protocol revisions after seeing v2 results):**
   binary gate. *(Typo corrected pre-run, before any v2 result existed: the sweep has
   4 fractions ≤ 0.10, not 3; the bar is ≥3/4 to preserve the intended ~2/3 stringency.)*
 
+**v2 ADJUDICATED (2026-07-03): FAIL — turbine is a tree benchmark; case closed.**
+`pre_target` beat best-tree on 1/4 low fracs (0.10, +0.009 ≪ its ±0.854 seed std) and
+lost to scratch at 0.01 (bar violated). Full curve (RMSE, `logs/turbine_labeleff_v2.json`):
+pre_target 13.82/13.64/13.24/12.32/12.01/12.71/13.21 vs best-tree
+12.16/12.27/12.16/12.33/12.23/12.25/12.44 at fracs 1/2/5/10/25/50/100%. **Salvage
+finding worth keeping:** target-period SSL beat train-only SSL at EVERY fraction
+(e.g. 13.75→12.32 at 10%, 13.42→12.01 at 25%, where it beat all three trees) — the
+transductive-SSL-under-drift mechanism is real but its magnitude is insufficient at
+low labels, and the curve is an inverted-U: deep is closest to trees at 10–25% labels
+and degrades toward full labels (fits the source distribution ever better while the
+test drifts). Per the lock: no v3, no re-litigation. The §3 kill clause now rests
+entirely on the 3W binary well-disjoint gate.
+
 ## 4. Architecture decisions (from the attention analysis)
 
 - **Bottleneck:** the row encoder mean-pools features to one vector per timestep, so the
