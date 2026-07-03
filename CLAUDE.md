@@ -75,11 +75,18 @@ uv run pytest tests/test_column_embeddings.py         # Single file
 uv run pytest tests/test_column_embeddings.py::test_x # Single test
 ```
 
-### Important: DO NOT run training scripts directly
+### Running training scripts
 
-The model outputs tqdm progress bars which will overflow the context window. Ask the
-user to run training scripts instead of running them yourself. Avoid commands like
-`uv run python examples/*.py` or `uv run python scripts/*.py`.
+Running training/experiment scripts is fine. The one hazard is unbounded output
+(tqdm progress bars, per-epoch logs) overflowing the context window, so:
+
+- **Redirect output to a log file and surface only the summary lines** (e.g.
+  `uv run python scripts/foo.py > /tmp/foo.log 2>&1 &`, then tail/grep for the result
+  rows), and prefer running long jobs in the background.
+- Disable progress bars where you can. `build_trainer` in `trea/training/single_row.py`
+  already sets `enable_progress_bar=False`; `scripts/tabular_vs_trees.py` also does
+  `logging.disable(logging.INFO)` to mute Lightning's per-fit device banner — copy that
+  pattern into scripts that still print it.
 
 ## Architecture
 
