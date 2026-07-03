@@ -381,7 +381,7 @@ class ThreeWDataset(Dataset):
 
         # Class distribution
         unique, counts = np.unique(self.labels, return_counts=True)
-        print(f"  Classes: {dict(zip(unique.tolist(), counts.tolist()))}")
+        print(f"  Classes: {dict(zip(unique.tolist(), counts.tolist(), strict=False))}")
 
         # Compute class weights (inverse frequency)
         total = len(self.labels)

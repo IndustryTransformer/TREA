@@ -359,7 +359,7 @@ class W3DataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             sampler=sampler,  # Use sampler instead of shuffle
             num_workers=self.num_workers,
-            persistent_workers=True if self.num_workers > 0 else False,
+            persistent_workers=self.num_workers > 0,
             pin_memory=True,
         )
 
@@ -369,7 +369,7 @@ class W3DataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            persistent_workers=True if self.num_workers > 0 else False,
+            persistent_workers=self.num_workers > 0,
             pin_memory=True,
         )
 
@@ -379,7 +379,7 @@ class W3DataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            persistent_workers=True if self.num_workers > 0 else False,
+            persistent_workers=self.num_workers > 0,
             pin_memory=True,
         )
 
