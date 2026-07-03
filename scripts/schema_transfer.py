@@ -203,7 +203,10 @@ def rmse(model, df_eval, cfg, tscale):
     model.eval()
     preds, ys = [], []
     for b in loader(df_eval, cfg):
-        preds.append(model(b).cpu().numpy())
+        # predict_value (not the bare forward) so this stays correct if a head other
+        # than plain MSE (e.g. hl_gauss, which forward() leaves as raw bin logits) is
+        # ever wired into this script.
+        preds.append(model.predict_value(b).cpu().numpy())
         ys.append(b.target.cpu().numpy())
     p, y = np.concatenate(preds).ravel(), np.concatenate(ys).ravel()
     return float(np.sqrt(mean_squared_error(y, p))) * tscale

@@ -45,7 +45,12 @@ def adamw_parameter_groups(module: nn.Module, weight_decay: float):
     for name, param in module.named_parameters():
         if not param.requires_grad:
             continue
-        if name.endswith(".bias") or name == "bias" or id(param) in no_decay_ids:
+        if (
+            name.endswith(".bias")
+            or name.endswith("in_proj_bias")  # nn.MultiheadAttention's fused QKV bias
+            or name == "bias"
+            or id(param) in no_decay_ids
+        ):
             no_decay_params.append(param)
             no_decay_names.append(name)
         else:
@@ -85,6 +90,11 @@ def _configure_adamw(module: L.LightningModule):
         "optimizer": opt,
         "lr_scheduler": {"scheduler": sched, "interval": "step"},
     }
+
+
+def _set_entropy_tracking(encoder, enabled: bool):
+    for layer in encoder.layers:
+        layer.track_entropy = enabled
 
 
 def _log_attention_entropy(module: L.LightningModule, encoder, prefix: str):
@@ -217,17 +227,32 @@ class SingleRowRegressor(L.LightningModule):
         return self.model.predict(batch.inputs.numeric, batch.inputs.categorical)
 
     def _step(self, batch, name):
+        is_val = name == "val_loss"
+        if is_val:
+            _set_entropy_tracking(self.model.tabular_encoder, True)
         out = self.model(batch.inputs.numeric, batch.inputs.categorical)
+        if is_val:
+            _set_entropy_tracking(self.model.tabular_encoder, False)
         if out.dim() == 3:
-            # Ensembled: [b, k, out]. Loss = mean of the k members' MSE (each member
-            # regresses the shared target); a plain mean over the broadcast target is
-            # exactly that average.
-            target = batch.target.unsqueeze(1).expand_as(out)
+            # Ensembled: [b, k, out]. Flatten members into the batch dim and repeat the
+            # target k times -- NOT `expand_as(out)`, which for a multi-column loss
+            # target (e.g. HL-Gauss's [b, n_bins] bin logits) would broadcast the
+            # target across the bin dim too and corrupt both HLGaussLoss's per-row
+            # target_distribution and its log_softmax(dim=1) (the bin dim, not the
+            # member dim). Flattening keeps every loss identical to the single-model
+            # case, just called b*k times; mean reduction is exactly the members' mean.
+            b, k, o = out.shape
+            out = out.reshape(b * k, o)
+            target = (
+                batch.target.unsqueeze(1)
+                .expand(b, k, batch.target.size(-1))
+                .reshape(b * k, batch.target.size(-1))
+            )
         else:
             target = batch.target
         loss = self.loss_fn(out, target)
         self.log(name, loss, prog_bar=(name == "val_loss"))
-        if name == "val_loss":
+        if is_val:
             _log_attention_entropy(self, self.model.tabular_encoder, "val")
         return loss
 
@@ -331,7 +356,12 @@ class SingleRowClassifier(L.LightningModule):
         return logits - tau * self.class_log_priors
 
     def _step(self, batch, name):
+        is_val = name == "val_loss"
+        if is_val:
+            _set_entropy_tracking(self.model.tabular_encoder, True)
         logits = self.model(batch.inputs.numeric, batch.inputs.categorical)
+        if is_val:
+            _set_entropy_tracking(self.model.tabular_encoder, False)
         target = batch.target.long().view(-1)
         if logits.dim() == 3:
             # Ensembled: [b, k, C]. Flatten to [b*k, C] and repeat each target k times
@@ -405,6 +435,8 @@ class SingleRowMTM(L.LightningModule):
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
+        value_encoder: str = "identity",
+        fusion: str = "additive",
         warmup_frac: float = 0.05,
         weight_decay: float = 3e-4,
     ):
@@ -423,6 +455,8 @@ class SingleRowMTM(L.LightningModule):
             column_descriptions,
             qk_norm=qk_norm,
             pre_norm=pre_norm,
+            value_encoder=value_encoder,
+            fusion=fusion,
         )
         self.numeric_loss_fn = nn.MSELoss(reduction="none")
         self.categorical_loss_fn = nn.CrossEntropyLoss(reduction="none")
@@ -459,10 +493,15 @@ class SingleRowMTM(L.LightningModule):
             )
         else:
             cat_masked, cat_mask = None, None
+        is_val = name == "val_loss"
+        if is_val:
+            _set_entropy_tracking(self.model.tabular_encoder, True)
         predicted = self.model(num_masked, cat_masked)
+        if is_val:
+            _set_entropy_tracking(self.model.tabular_encoder, False)
         loss = self.aggregate_loss(batch, predicted, num_mask, cat_mask)
         self.log(name, loss, prog_bar=(name == "val_loss"))
-        if name == "val_loss":
+        if is_val:
             _log_attention_entropy(self, self.model.tabular_encoder, "val")
         return loss
 
@@ -497,10 +536,16 @@ def copy_encoder_weights(src_encoder, dst_encoder, include_col_embedder: bool = 
     (fresh identities on the destination). This is the charitable index-embedding
     control: index embeddings have no cross-schema name correspondence, so the most
     they can offer is the transferred attention stack + value embeddings.
+
+    ``numeric_quantiles`` (the dual value-encoder's PLE bin boundaries) is always
+    excluded: it is a per-schema train-data statistic, not a learned weight. Copying
+    it would bin the destination's values against the source schema's boundaries; the
+    destination keeps the quantiles it was already constructed with.
     """
     sd = src_encoder.state_dict()
     if not include_col_embedder:
         sd = {k: v for k, v in sd.items() if not k.startswith("col_embedder.")}
+    sd = {k: v for k, v in sd.items() if not k.endswith("numeric_quantiles")}
     dst_encoder.load_state_dict(sd, strict=False)
     return dst_encoder
 

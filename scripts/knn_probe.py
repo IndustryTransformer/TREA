@@ -198,10 +198,31 @@ def untrained_encoder(cfg, task, n_classes, seed):
 
 
 def load_checkpoint(path, cfg, task, n_classes):
-    """Load a trained SingleRow{Classifier,Regressor}; config isn't pickled, pass it."""
+    """Load a trained SingleRow{Classifier,Regressor}; config isn't pickled, pass it.
+
+    Checkpoints saved before an architecture param existed (e.g. qk_norm/pre_norm's
+    q_norm/k_norm layers) fail a strict state_dict load. Retry with strict=False and
+    warn loudly about it -- silently leaving submodules randomly initialized would
+    make the probe's verdict describe a different, weaker encoder than intended.
+    """
     cls = SingleRowRegressor if task == "regression" else SingleRowClassifier
     kw = {} if task == "regression" else {"num_classes": n_classes}
-    return cls.load_from_checkpoint(path, config=cfg, map_location="cpu", **kw)
+    try:
+        return cls.load_from_checkpoint(path, config=cfg, map_location="cpu", **kw)
+    except RuntimeError as e:
+        if "Missing key(s)" not in str(e) and "Unexpected key(s)" not in str(e):
+            raise
+        model = cls.load_from_checkpoint(
+            path, config=cfg, map_location="cpu", strict=False, **kw
+        )
+        print(
+            f"  !! WARNING: {path} does not match the current architecture "
+            "(likely a pre-qk_norm/pre_norm checkpoint) -- missing weights were left "
+            "at random init. Probe results may not reflect the original trained "
+            "encoder.",
+            flush=True,
+        )
+        return model
 
 
 def extract_embeddings(model, X, y, feat, cfg, device):

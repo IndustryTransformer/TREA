@@ -92,15 +92,26 @@ class TransformerEncoderLayer(nn.Module):
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
         self.last_attn_entropy: torch.Tensor | None = None
+        # Entropy is only ever read once per val epoch (_log_attention_entropy), but
+        # computing it costs a materialized [B(*k), h, T, T] probs tensor every forward
+        # and (for qk_norm=False) forces MultiheadAttention off its fused kernel. The
+        # training module flips this on only around validation forward passes.
+        self.track_entropy = False
         self.apply(initialize_parameters)
 
     def _attention(self, q, k, v):
         if not self.qk_norm:
-            attn_out, attn_weights = self.attn(
-                q, k, v, need_weights=True, average_attn_weights=False
-            )
-            probs = attn_weights.detach().clamp_min(1e-12)
-            self.last_attn_entropy = -(probs * probs.log()).sum(dim=-1).mean(dim=(0, 2))
+            if self.track_entropy:
+                attn_out, attn_weights = self.attn(
+                    q, k, v, need_weights=True, average_attn_weights=False
+                )
+                probs = attn_weights.detach().clamp_min(1e-12)
+                self.last_attn_entropy = (
+                    -(probs * probs.log()).sum(dim=-1).mean(dim=(0, 2))
+                )
+            else:
+                attn_out, _ = self.attn(q, k, v, need_weights=False)
+                self.last_attn_entropy = None
             return attn_out
 
         b = q.size(0)
@@ -116,10 +127,13 @@ class TransformerEncoderLayer(nn.Module):
         vh = split_heads(v_proj)
         scores = torch.matmul(qh, kh.transpose(-2, -1)) / math.sqrt(self.head_dim)
         probs = F.softmax(scores, dim=-1)
-        safe_probs = probs.detach().clamp_min(1e-12)
-        self.last_attn_entropy = (
-            -(safe_probs * safe_probs.log()).sum(dim=-1).mean(dim=(0, 2))
-        )
+        if self.track_entropy:
+            safe_probs = probs.detach().clamp_min(1e-12)
+            self.last_attn_entropy = (
+                -(safe_probs * safe_probs.log()).sum(dim=-1).mean(dim=(0, 2))
+            )
+        else:
+            self.last_attn_entropy = None
         probs = F.dropout(probs, p=self.attn.dropout, training=self.training)
         out = torch.matmul(probs, vh)
         out = out.transpose(1, 2).contiguous().view(b, q.size(1), -1)
@@ -475,7 +489,13 @@ class TabularClassifier(nn.Module):
 
 
 class MaskedTabularEncoder(nn.Module):
-    """Encoder + reconstruction heads for masked tabular modeling (MTM pretraining)."""
+    """Encoder + reconstruction heads for masked tabular modeling (MTM pretraining).
+
+    ``ensemble_k`` is deliberately not exposed here: BatchEnsemble expands the batch
+    dim k-fold inside ``TabularEncoder``, which the reconstruction heads/targets below
+    are not shaped for (would need a per-member target repeat). A pretrained encoder
+    with ``ensemble_k > 0`` therefore has to be trained supervised, not via MTM.
+    """
 
     def __init__(
         self,
@@ -488,6 +508,8 @@ class MaskedTabularEncoder(nn.Module):
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
+        value_encoder: str = "identity",
+        fusion: str = "additive",
     ):
         super().__init__()
         self.config = config
@@ -501,6 +523,8 @@ class MaskedTabularEncoder(nn.Module):
             column_descriptions,
             qk_norm=qk_norm,
             pre_norm=pre_norm,
+            value_encoder=value_encoder,
+            fusion=fusion,
         )
         flat = config.n_columns * d_model
         if config.n_cat_cols > 0:

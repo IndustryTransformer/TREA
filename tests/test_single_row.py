@@ -18,6 +18,7 @@ from trea.training.single_row import (
     SingleRowRegressor,
     adamw_parameter_groups,
     build_trainer,
+    copy_encoder_weights,
     transfer_encoder,
 )
 from trea.utils.single_row_data import (
@@ -643,3 +644,129 @@ def test_ensemble_runtime_is_a_single_batched_forward():
         # Compute-bound CPU: work is genuinely ~k x. Guard only that it stays near k x
         # (the efficient reshape), not the per-iteration blowup of a Python loop.
         assert ratio < (k + 2), f"ensemble k={k} overhead {ratio:.2f}x >> {k}x (loop?)"
+
+
+def test_hl_gauss_ensemble_step_broadcasts_target_correctly():
+    """head='hl_gauss' + ensemble_k>0 must not broadcast the target over the bin dim.
+
+    Regression test: the old `target.unsqueeze(1).expand_as(out)` expanded the scalar
+    target across BOTH the member dim and HL-Gauss's n_bins output dim, corrupting
+    target_distribution's per-row binning and log_softmax's dim=1 (member, not bin).
+    """
+    df = _toy_df()
+    cfg = SingleRowConfig.generate(df, target="target")
+    loader = DataLoader(
+        TabularDS(df, cfg), batch_size=16, collate_fn=tabular_collate_fn
+    )
+    model = SingleRowRegressor(
+        cfg,
+        d_model=D_MODEL,
+        n_heads=N_HEADS,
+        n_layers=N_LAYERS,
+        dropout=0.0,  # deterministic: compare _step's loss against a manual recompute
+        head="hl_gauss",
+        y_train=df["target"].values,
+        hl_gauss_bins=17,
+        ensemble_k=4,
+    )
+    model.eval()
+    batch = next(iter(loader))
+    loss = model._step(batch, "train_loss")
+    assert torch.isfinite(loss)
+
+    # Loss must equal the mean of the k members' independent HL-Gauss losses (i.e. the
+    # flatten-and-repeat contract), not something contaminated by cross-bin broadcast.
+    with torch.no_grad():
+        out = model.model(batch.inputs.numeric, batch.inputs.categorical)
+        member_losses = [model.loss_fn(out[:, m, :], batch.target) for m in range(4)]
+    assert torch.allclose(loss, torch.stack(member_losses).mean(), atol=1e-5)
+
+
+def test_copy_encoder_weights_excludes_numeric_quantiles():
+    """Cross-schema transfer must not copy the dual encoder's PLE quantile buffer."""
+    df_src = _toy_df()
+    df_src["a"] = df_src["a"] * 100 + 1000  # very different scale from dst
+    cfg_src = SingleRowConfig.generate(df_src, target="target")
+    cfg_dst = SingleRowConfig.generate(_toy_df(seed=1), target="target")
+
+    src = SingleRowRegressor(
+        cfg_src,
+        d_model=D_MODEL,
+        n_heads=N_HEADS,
+        n_layers=N_LAYERS,
+        value_encoder="dual",
+    )
+    dst = SingleRowRegressor(
+        cfg_dst,
+        d_model=D_MODEL,
+        n_heads=N_HEADS,
+        n_layers=N_LAYERS,
+        value_encoder="dual",
+    )
+    dst_quantiles_before = dst.model.tabular_encoder.numeric_quantiles.clone()
+    copy_encoder_weights(
+        src.model.tabular_encoder,
+        dst.model.tabular_encoder,
+        include_col_embedder=False,
+    )
+    assert torch.allclose(
+        dst_quantiles_before, dst.model.tabular_encoder.numeric_quantiles
+    )
+    # sanity: the copy did move other weights (e.g. ple_bank) across
+    assert torch.allclose(
+        dst.model.tabular_encoder.ple_bank.weight,
+        src.model.tabular_encoder.ple_bank.weight,
+    )
+
+
+def test_mtm_accepts_value_encoder_and_transfers_to_dual_regressor():
+    """SingleRowMTM must support value_encoder/fusion so pretrain->finetune can match
+    a dual-value-encoder regressor (previously crashed via transfer_encoder or silently
+    left ple_bank/periodic_freqs at random init via copy_encoder_weights)."""
+    df = _toy_df()
+    cfg_mtm = SingleRowConfig.generate(df.drop(columns=["target"]))
+    loader = DataLoader(
+        TabularDS(df.drop(columns=["target"]), cfg_mtm),
+        batch_size=16,
+        collate_fn=masked_tabular_collate_fn,
+    )
+    mtm = SingleRowMTM(
+        cfg_mtm,
+        d_model=D_MODEL,
+        n_heads=N_HEADS,
+        n_layers=N_LAYERS,
+        value_encoder="dual",
+        fusion="hadamard",
+    )
+    batch = next(iter(loader))
+    loss = mtm._step(batch, "val_loss")
+    assert torch.isfinite(loss)
+
+    cfg_reg = SingleRowConfig.generate(df, target="target")
+    reg = SingleRowRegressor(
+        cfg_reg,
+        d_model=D_MODEL,
+        n_heads=N_HEADS,
+        n_layers=N_LAYERS,
+        value_encoder="dual",
+        fusion="hadamard",
+    )
+    before = reg.model.tabular_encoder.ple_bank.weight.clone()
+    transfer_encoder(mtm, reg)  # strict load must succeed (shapes now match)
+    assert torch.allclose(
+        reg.model.tabular_encoder.ple_bank.weight,
+        mtm.model.tabular_encoder.ple_bank.weight,
+    )
+    assert not torch.allclose(before, reg.model.tabular_encoder.ple_bank.weight)
+
+
+def test_attention_entropy_not_tracked_outside_validation():
+    """Entropy is only computed during val steps -- forward calls outside Lightning's
+    val loop (e.g. embedding extraction in scripts/knn_probe.py) must not pay for it."""
+    df = _toy_df()
+    cfg = SingleRowConfig.generate(df, target="target")
+    model = SingleRowRegressor(cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS)
+    model.model.tabular_encoder(torch.randn(4, cfg.n_numeric_cols), None)
+    for layer in model.model.tabular_encoder.layers:
+        assert layer.track_entropy is False
+        assert layer.last_attn_entropy is None
