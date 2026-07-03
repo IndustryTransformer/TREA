@@ -24,7 +24,6 @@ Pieces:
 import math
 
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -36,7 +35,7 @@ class NumericCategoricalData:
     """A single-row batch: numeric features and (optional) categorical features."""
 
     numeric: torch.Tensor
-    categorical: Optional[torch.Tensor] = None
+    categorical: torch.Tensor | None = None
 
     def to(self, device):
         self.numeric = self.numeric.to(device)
@@ -101,11 +100,24 @@ class TabularEncoder(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        ensemble_k=0,
     ):
         super().__init__()
         self.d_model = d_model
         self.n_numeric_cols = config.n_numeric_cols
         self.n_cat_cols = config.n_cat_cols
+
+        # TabM-mini BatchEnsemble (arXiv:2410.24210): k members share every weight
+        # except a single per-member multiplicative vector adapter applied to the
+        # token embeddings right after the embedding layer. Members diverge from the
+        # random-sign init of that adapter alone; the batch is expanded k-fold in a
+        # single reshaped forward (no Python loop), so the transformer stack runs once.
+        # ensemble_k=0 disables the mechanism (behaviour identical to a single model).
+        self.ensemble_k = ensemble_k
+        if ensemble_k > 0:
+            # First (and only) adapter -> random {-1, +1} signs per the paper.
+            signs = torch.randint(0, 2, (ensemble_k, d_model)).float() * 2 - 1
+            self.ensemble_adapter = nn.Parameter(signs)
 
         self.embeddings = nn.Embedding(config.n_tokens, d_model)
         self.register_buffer(
@@ -193,6 +205,17 @@ class TabularEncoder(nn.Module):
         else:
             values = base_numeric
 
+        if self.ensemble_k > 0:
+            # Expand [b, T, d] -> [b*k, T, d] and scale every token embedding by the
+            # member's adapter r_k. Flat layout is (b, k): row index = b_idx*k + member,
+            # which the heads reshape back to [b, k, out]. Both the identity query and
+            # the value tokens are scaled so each member is a distinct forward pass.
+            k = self.ensemble_k
+            t_col, t_val, d = col_emb.size(1), values.size(1), col_emb.size(2)
+            r = self.ensemble_adapter.view(1, k, 1, d)
+            col_emb = (col_emb.unsqueeze(1) * r).reshape(b * k, t_col, d)
+            values = (values.unsqueeze(1) * r).reshape(b * k, t_val, d)
+
         x = self.layers[0](col_emb, values, values)
         for layer in self.layers[1:]:
             # The block already carries its own attention/FFN residuals; use its output
@@ -231,6 +254,7 @@ class TabularRegressor(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        ensemble_k=0,
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -241,6 +265,7 @@ class TabularRegressor(nn.Module):
             dropout,
             col_embedder,
             column_descriptions,
+            ensemble_k=ensemble_k,
         )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)
@@ -257,7 +282,18 @@ class TabularRegressor(nn.Module):
     def forward(self, num_inputs, cat_inputs):
         out = self.tabular_encoder(num_inputs, cat_inputs)
         out = self.dropout(self.pooling(out))
-        return self.regressor(out)
+        pred = self.regressor(out)
+        k = self.tabular_encoder.ensemble_k
+        if k > 0:
+            # [b*k, out] -> [b, k, out]; the member dim is explicit for the ensembled
+            # loss (mean over members) and averaged away at inference by ``predict``.
+            pred = pred.view(-1, k, pred.size(-1))
+        return pred
+
+    def predict(self, num_inputs, cat_inputs):
+        """Ensemble-averaged point prediction [b, out] (mean over members)."""
+        out = self.forward(num_inputs, cat_inputs)
+        return out.mean(dim=1) if out.dim() == 3 else out
 
 
 class TabularClassifier(nn.Module):
@@ -277,6 +313,7 @@ class TabularClassifier(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        ensemble_k=0,
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -287,6 +324,7 @@ class TabularClassifier(nn.Module):
             dropout,
             col_embedder,
             column_descriptions,
+            ensemble_k=ensemble_k,
         )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)
@@ -300,7 +338,19 @@ class TabularClassifier(nn.Module):
     def forward(self, num_inputs, cat_inputs):
         out = self.tabular_encoder(num_inputs, cat_inputs)
         out = self.dropout(self.pooling(out))
-        return self.head(out)
+        logits = self.head(out)
+        k = self.tabular_encoder.ensemble_k
+        if k > 0:
+            # [b*k, C] -> [b, k, C]; explicit member dim for the ensembled CE loss.
+            logits = logits.view(-1, k, logits.size(-1))
+        return logits
+
+    def predict(self, num_inputs, cat_inputs):
+        """Ensemble-averaged class probabilities [b, C] (mean of member softmaxes)."""
+        out = self.forward(num_inputs, cat_inputs)
+        if out.dim() == 3:
+            return out.softmax(dim=-1).mean(dim=1)
+        return out.softmax(dim=-1)
 
 
 class MaskedTabularEncoder(nn.Module):

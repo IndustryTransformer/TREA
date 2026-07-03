@@ -10,10 +10,10 @@ build_trainer       -- Trainer with early-stopping + best-val checkpointing bake
 """
 
 import os
-from typing import Optional
 
 import pytorch_lightning as L
 import torch
+
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch import nn
 
@@ -37,6 +37,7 @@ class SingleRowRegressor(L.LightningModule):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        ensemble_k=0,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
@@ -49,15 +50,23 @@ class SingleRowRegressor(L.LightningModule):
             dropout,
             col_embedder,
             column_descriptions,
+            ensemble_k=ensemble_k,
         )
         self.loss_fn = nn.MSELoss()
 
     def forward(self, batch: InputsTarget):
-        return self.model(batch.inputs.numeric, batch.inputs.categorical)
+        return self.model.predict(batch.inputs.numeric, batch.inputs.categorical)
 
     def _step(self, batch, name):
         y_hat = self.model(batch.inputs.numeric, batch.inputs.categorical)
-        loss = self.loss_fn(y_hat, batch.target)
+        if y_hat.dim() == 3:
+            # Ensembled: [b, k, out]. Loss = mean of the k members' MSE (each member
+            # regresses the shared target); a plain mean over the broadcast target is
+            # exactly that average.
+            target = batch.target.unsqueeze(1).expand_as(y_hat)
+        else:
+            target = batch.target
+        loss = self.loss_fn(y_hat, target)
         self.log(name, loss, prog_bar=(name == "val_loss"))
         return loss
 
@@ -97,6 +106,7 @@ class SingleRowClassifier(L.LightningModule):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        ensemble_k=0,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
@@ -110,15 +120,24 @@ class SingleRowClassifier(L.LightningModule):
             dropout,
             col_embedder,
             column_descriptions,
+            ensemble_k=ensemble_k,
         )
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, batch: InputsTarget):
-        return self.model(batch.inputs.numeric, batch.inputs.categorical)
+        return self.model.predict(batch.inputs.numeric, batch.inputs.categorical)
 
     def _step(self, batch, name):
         logits = self.model(batch.inputs.numeric, batch.inputs.categorical)
-        loss = self.loss_fn(logits, batch.target.long().view(-1))
+        target = batch.target.long().view(-1)
+        if logits.dim() == 3:
+            # Ensembled: [b, k, C]. Flatten to [b*k, C] and repeat each target k times
+            # (row order is member-fast, matching the encoder's expand); CE(reduction=
+            # "mean") over that is exactly the mean of the k members' losses.
+            b, k, c = logits.shape
+            logits = logits.reshape(b * k, c)
+            target = target.view(b, 1).expand(b, k).reshape(-1)
+        loss = self.loss_fn(logits, target)
         self.log(name, loss, prog_bar=(name == "val_loss"))
         return loss
 
@@ -235,8 +254,8 @@ def copy_encoder_weights(src_encoder, dst_encoder, include_col_embedder: bool = 
 
 def build_trainer(
     max_epochs: int = 100,
-    patience: Optional[int] = 8,
-    ckpt_dir: Optional[str] = None,
+    patience: int | None = 8,
+    ckpt_dir: str | None = None,
     grad_clip: float = 1.0,
 ):
     """Trainer with early-stopping (if patience set) and best-val checkpointing.

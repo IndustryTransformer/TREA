@@ -101,7 +101,18 @@ def _frame(X, y, feat):
 
 
 def deep_score(
-    Xtr, ytr, Xte, yte, feat, task, n_classes, tscale, seed, epochs=100, patience=8
+    Xtr,
+    ytr,
+    Xte,
+    yte,
+    feat,
+    task,
+    n_classes,
+    tscale,
+    seed,
+    epochs=100,
+    patience=8,
+    ensemble_k=0,
 ):
     L.seed_everything(seed, verbose=False)
     fit_i, val_i = train_test_split(
@@ -120,7 +131,12 @@ def deep_score(
 
     if task == "regression":
         model = SingleRowRegressor(
-            cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS, lr=LR
+            cfg,
+            d_model=D_MODEL,
+            n_heads=N_HEADS,
+            n_layers=N_LAYERS,
+            lr=LR,
+            ensemble_k=ensemble_k,
         )
     else:
         model = SingleRowClassifier(
@@ -130,6 +146,7 @@ def deep_score(
             n_heads=N_HEADS,
             n_layers=N_LAYERS,
             lr=LR,
+            ensemble_k=ensemble_k,
         )
     ckdir = (
         Path(os.environ["TMPDIR"] if "TMPDIR" in os.environ else "/tmp") / f"tvt_{seed}"
@@ -153,7 +170,9 @@ def deep_score(
     preds = []
     with torch.no_grad():
         for b in te_loader:
-            out = model.model(b.inputs.numeric.to(model.device), None)
+            # predict() averages over ensemble members (probabilities / point means);
+            # a no-op returning single-model output when ensemble_k == 0.
+            out = model.model.predict(b.inputs.numeric.to(model.device), None)
             preds.append(out.cpu().numpy())
     P = np.concatenate(preds)
     if task == "regression":
@@ -204,6 +223,12 @@ def main():
     ap.add_argument("--tasks", nargs="+", default=["regression", "classification"])
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument(
+        "--ensemble-k",
+        type=int,
+        default=0,
+        help="TabM-mini BatchEnsemble members (0=off; 32 recommended).",
+    )
     a = ap.parse_args()
     epochs, patience = (3, 2) if a.smoke else (100, 8)
     if a.smoke:
@@ -216,7 +241,8 @@ def main():
             pick += [m for m in datasets if m["task"] == t][:2]
         datasets = pick
     print(
-        f"datasets={len(datasets)} | tasks={a.tasks} | seeds={a.seeds} | device="
+        f"datasets={len(datasets)} | tasks={a.tasks} | seeds={a.seeds} | "
+        f"ensemble_k={a.ensemble_k} | device="
         f"{'cuda' if torch.cuda.is_available() else 'cpu'}",
         flush=True,
     )
@@ -246,6 +272,7 @@ def main():
                         seed,
                         epochs,
                         patience,
+                        a.ensemble_k,
                     )
                 )
                 row["xgb"].append(
