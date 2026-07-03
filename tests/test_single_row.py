@@ -128,6 +128,39 @@ def test_mtm_numeric_only_uses_masked_cells_only():
     assert torch.isfinite(loss)
 
 
+def test_mtm_aggregate_loss_only_on_masked():
+    # Test that MTM loss is only calculated on masked cells
+    from trea.models.single_row import NumericCategoricalData
+
+    df = _toy_df().drop(columns=["cat", "target"])
+    cfg = SingleRowConfig.generate(df)
+    mtm = SingleRowMTM(cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS)
+
+    # Create manual actual and predicted tensors
+    actual = NumericCategoricalData(numeric=torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
+    predicted = NumericCategoricalData(numeric=torch.tensor([[1.5, 2.5], [3.5, 4.5]]))
+
+    # Mask is: row 0 col 0 is masked, others not
+    num_mask = torch.tensor([[True, False], [False, False]])
+
+    # Loss should only be based on actual[0,0] vs predicted[0,0]
+    # which is (1.5 - 1.0)^2 = 0.25
+    loss = mtm.aggregate_loss(actual, predicted, num_mask, cat_mask=None)
+    assert torch.allclose(loss, torch.tensor(0.25))
+
+    # If we modify actual[0,1] (unmasked), the loss should NOT change!
+    actual.numeric = actual.numeric.clone()
+    actual.numeric[0, 1] = 999.0
+    loss2 = mtm.aggregate_loss(actual, predicted, num_mask, cat_mask=None)
+    assert torch.allclose(loss2, torch.tensor(0.25))
+
+    # If we modify predicted[0,1] (unmasked), the loss should NOT change!
+    predicted.numeric = predicted.numeric.clone()
+    predicted.numeric[0, 1] = 999.0
+    loss3 = mtm.aggregate_loss(actual, predicted, num_mask, cat_mask=None)
+    assert torch.allclose(loss3, torch.tensor(0.25))
+
+
 def test_mask_tensor_fraction_and_dtype():
     L.seed_everything(0, verbose=False)
     df = _toy_df()

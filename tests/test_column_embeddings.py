@@ -102,11 +102,21 @@ class TestColumnEmbedding:
     def test_factory_function(self):
         """Test the factory function."""
         column_names = ["test1", "test2"]
-        emb = create_column_embedding(column_names, target_dim=2)
+        # Default strategy is "simple" which returns SimpleColumnEmbedding
+        emb_simple = create_column_embedding(
+            column_names, target_dim=2, strategy="simple"
+        )
+        from trea.models.embeddings import SimpleColumnEmbedding
 
-        assert isinstance(emb, ColumnEmbedding)
-        assert emb.column_names == column_names
-        assert emb.target_dim == 2
+        assert isinstance(emb_simple, SimpleColumnEmbedding)
+        assert emb_simple.column_names == column_names
+        assert emb_simple.target_dim == 2
+
+        # "bert" strategy returns ColumnEmbedding (which is BERTColumnEmbedding)
+        emb_bert = create_column_embedding(column_names, target_dim=2, strategy="bert")
+        assert isinstance(emb_bert, ColumnEmbedding)
+        assert emb_bert.column_names == column_names
+        assert emb_bert.target_dim == 2
 
     def test_tokenization_edge_cases(self):
         """Test tokenization with edge cases."""

@@ -360,7 +360,10 @@ class MaskedTabularEncoder(nn.Module):
             column_descriptions,
         )
         flat = config.n_columns * d_model
-        self.cat_decoder = nn.Linear(flat, config.n_cat_cols * config.n_tokens)
+        if config.n_cat_cols > 0:
+            self.cat_decoder = nn.Linear(flat, config.n_cat_cols * config.n_tokens)
+        else:
+            self.cat_decoder = None
         self.num_decoder = nn.Sequential(
             nn.Linear(flat, 4 * d_model),
             nn.GELU(),
@@ -374,9 +377,12 @@ class MaskedTabularEncoder(nn.Module):
     def forward(self, num_inputs, cat_inputs):
         out = self.tabular_encoder(num_inputs, cat_inputs)
         flat = out.reshape(out.size(0), -1)
-        cat_out = self.cat_decoder(flat).view(
-            out.size(0), self.config.n_cat_cols, self.config.n_tokens
-        )
+        if self.config.n_cat_cols > 0 and self.cat_decoder is not None:
+            cat_out = self.cat_decoder(flat).view(
+                out.size(0), self.config.n_cat_cols, self.config.n_tokens
+            )
+        else:
+            cat_out = None
         num_out = self.num_decoder(flat)
         return NumericCategoricalData(numeric=num_out, categorical=cat_out)
 
@@ -388,9 +394,13 @@ def mask_tensor(tensor, encoder, keep_prob=0.7, return_mask=False):
     categorical cells become the categorical mask token. Fixes the Hephaestus bug
     where `probability` was bound to batch_idx (degenerate, near-no-op masking).
     """
+    if tensor is None:
+        if return_mask:
+            return None, None
+        return None
     tensor = tensor.clone()
     bit_mask = torch.rand(tensor.shape, device=tensor.device) > keep_prob
-    if tensor.dtype == torch.float32:
+    if tensor.is_floating_point():
         tensor[bit_mask] = float("-inf")
     else:
         tensor[bit_mask] = encoder.cat_mask_token.to(tensor.device)
