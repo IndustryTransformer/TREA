@@ -37,6 +37,7 @@ import pandas as pd
 import pytorch_lightning as L
 import torch
 
+from catboost import CatBoostClassifier, CatBoostRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import f1_score, mean_squared_error
 from sklearn.model_selection import train_test_split
@@ -250,12 +251,15 @@ def deep_score(
     }
 
 
+TREE_KINDS = ("xgb", "rf", "cat")  # classical baselines; best-of-these is the bar
+
+
 def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed, n_jobs=-1):
     Xtr_i = np.nan_to_num(Xtr, nan=0.0)  # trees have no missing channel -> mean-impute
     Xte_i = np.nan_to_num(Xte, nan=0.0)
     if task == "regression":
-        m = (
-            XGBRegressor(
+        if kind == "xgb":
+            m = XGBRegressor(
                 n_estimators=400,
                 max_depth=6,
                 learning_rate=0.05,
@@ -264,15 +268,23 @@ def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed, n_jobs=-1):
                 n_jobs=n_jobs,
                 random_state=seed,
             )
-            if kind == "xgb"
-            else RandomForestRegressor(
+        elif kind == "cat":
+            m = CatBoostRegressor(
+                iterations=400,
+                depth=6,
+                learning_rate=0.05,
+                random_seed=seed,
+                thread_count=n_jobs,
+                verbose=0,
+            )
+        else:
+            m = RandomForestRegressor(
                 n_estimators=300, n_jobs=n_jobs, random_state=seed
             )
-        )
         m.fit(Xtr_i, ytr)
         return float(np.sqrt(mean_squared_error(yte, m.predict(Xte_i)))) * tscale
-    m = (
-        XGBClassifier(
+    if kind == "xgb":
+        m = XGBClassifier(
             n_estimators=400,
             max_depth=6,
             learning_rate=0.05,
@@ -281,11 +293,21 @@ def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed, n_jobs=-1):
             n_jobs=n_jobs,
             random_state=seed,
         )
-        if kind == "xgb"
-        else RandomForestClassifier(
+    elif kind == "cat":
+        # auto_class_weights="Balanced" mirrors RF's class_weight -> fair on imbalance.
+        m = CatBoostClassifier(
+            iterations=400,
+            depth=6,
+            learning_rate=0.05,
+            random_seed=seed,
+            thread_count=n_jobs,
+            verbose=0,
+            auto_class_weights="Balanced",
+        )
+    else:
+        m = RandomForestClassifier(
             n_estimators=300, class_weight="balanced", n_jobs=n_jobs, random_state=seed
         )
-    )
     m.fit(Xtr_i, ytr)
     return float(f1_score(yte, m.predict(Xte_i), average="macro"))
 
@@ -304,7 +326,7 @@ def _score_dataset(payload):
         df = pd.read_parquet(CORPUS / f"{name}.parquet")
     except Exception as e:
         return i, {"__skip__": f"{name}: {e}"}
-    row = {"deep": [], "xgb": [], "rf": [], "seed_results": []}
+    row = {"deep": [], "xgb": [], "rf": [], "cat": [], "seed_results": []}
     try:
         for seed in range(cfg["seeds"]):
             Xtr, ytr, Xte, yte, tscale, nc = prep(df, feat, task, seed)
@@ -336,15 +358,20 @@ def _score_dataset(payload):
             rf = tree_score(
                 "rf", Xtr, ytr, Xte, yte, task, tscale, seed, cfg["tree_jobs"]
             )
+            cat = tree_score(
+                "cat", Xtr, ytr, Xte, yte, task, tscale, seed, cfg["tree_jobs"]
+            )
             row["deep"].append(deep["score"])
             row["xgb"].append(xgb)
             row["rf"].append(rf)
+            row["cat"].append(cat)
             row["seed_results"].append(
                 {
                     "seed": seed,
                     "deep": deep["score"],
                     "xgb": xgb,
                     "rf": rf,
+                    "cat": cat,
                     "collapsed": bool(deep.get("collapsed", False)),
                     "prediction_entropy": deep.get("prediction_entropy"),
                     "prediction_histogram": deep.get("prediction_histogram"),
@@ -358,7 +385,7 @@ def _score_dataset(payload):
         "n_rows": m["n_rows"],
         "n_features": len(feat),
     }
-    for k in ("deep", "xgb", "rf"):
+    for k in ("deep", "xgb", "rf", "cat"):
         rec[k], rec[k + "_std"] = float(np.mean(row[k])), float(np.std(row[k]))
     rec["seed_results"] = row["seed_results"]
     rec["collapsed"] = any(s["collapsed"] for s in row["seed_results"])
@@ -366,9 +393,14 @@ def _score_dataset(payload):
     return i, rec
 
 
+def _best_tree(rec, higher):
+    scores = [rec[k] for k in TREE_KINDS]
+    return max(scores) if higher else min(scores)
+
+
 def _print_row(i, rec):
     higher = rec["task"] == "classification"
-    best_tree = max(rec["xgb"], rec["rf"]) if higher else min(rec["xgb"], rec["rf"])
+    best_tree = _best_tree(rec, higher)
     tie = (
         (rec["deep"] >= best_tree - rec["deep_std"])
         if higher
@@ -378,7 +410,7 @@ def _print_row(i, rec):
     print(
         f"[{i:>2}] {rec['name']:34s} {rec['task'][:3]} {metric} "
         f"deep {rec['deep']:.3f}±{rec['deep_std']:.3f} "
-        f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} "
+        f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} cat {rec['cat']:.3f} "
         f"| {'TIE/WIN' if tie else 'loss'}",
         flush=True,
     )
@@ -491,7 +523,7 @@ def main():
         higher = task == "classification"
 
         def tie(r, higher=higher):
-            bt = max(r["xgb"], r["rf"]) if higher else min(r["xgb"], r["rf"])
+            bt = _best_tree(r, higher)
             return (
                 (r["deep"] >= bt - r["deep_std"])
                 if higher
@@ -499,7 +531,7 @@ def main():
             )
 
         def win(r, higher=higher):
-            bt = max(r["xgb"], r["rf"]) if higher else min(r["xgb"], r["rf"])
+            bt = _best_tree(r, higher)
             return (r["deep"] > bt) if higher else (r["deep"] < bt)
 
         n = len(rows)
