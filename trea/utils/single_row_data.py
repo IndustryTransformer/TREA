@@ -9,13 +9,14 @@ Differences from the Hephaestus original: no BERT/`transformers` dependency, and
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 import pandas as pd
 import torch
+
 from torch.utils.data import Dataset
 
 from trea.models.single_row import NumericCategoricalData
+
 
 SPECIAL_TOKENS = ["[PAD]", "[NUMERIC_MASK]", "[MASK]", "[UNK]", "[NUMERIC_EMBEDDING]"]
 
@@ -23,7 +24,7 @@ SPECIAL_TOKENS = ["[PAD]", "[NUMERIC_MASK]", "[MASK]", "[UNK]", "[NUMERIC_EMBEDD
 @dataclass
 class InputsTarget:
     inputs: NumericCategoricalData
-    target: Optional[torch.Tensor] = None
+    target: torch.Tensor | None = None
 
 
 @dataclass
@@ -37,12 +38,10 @@ class SingleRowConfig:
     n_numeric_cols: int
     n_cat_cols: int
     n_columns: int
-    target: Optional[str] = None
+    target: str | None = None
 
     @classmethod
-    def generate(
-        cls, df: pd.DataFrame, target: Optional[str] = None
-    ) -> "SingleRowConfig":
+    def generate(cls, df: pd.DataFrame, target: str | None = None) -> "SingleRowConfig":
         numeric_cols = [
             c for c in df.select_dtypes(include="number").columns if c != target
         ]
@@ -77,11 +76,12 @@ class TabularDS(Dataset):
         self.target_df = (
             pd.DataFrame(df.pop(config.target)) if config.target is not None else None
         )
-        cat = df.select_dtypes(include="object").astype(str)
+        cat = df[config.categorical_col_tokens].astype(str)
+        unk = config.token_dict["[UNK]"]
         for c in cat.columns:
-            cat[c] = cat[c].map(config.token_dict)
+            cat[c] = cat[c].map(config.token_dict).fillna(unk).astype("int64")
         self.cat = cat
-        self.numeric = df.select_dtypes(include="number")
+        self.numeric = df[config.numeric_col_tokens]
 
     def __len__(self):
         return self.len

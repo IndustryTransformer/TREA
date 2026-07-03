@@ -4,15 +4,17 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as L
 import torch
+
 from torch.utils.data import DataLoader
 
 from trea.models.single_row import mask_tensor
 from trea.training.single_row import (
+    HLGaussLoss,
+    LogitAdjustedCrossEntropy,
     SingleRowClassifier,
     SingleRowMTM,
     SingleRowRegressor,
     build_trainer,
-    load_best,
     transfer_encoder,
 )
 from trea.utils.single_row_data import (
@@ -21,6 +23,7 @@ from trea.utils.single_row_data import (
     masked_tabular_collate_fn,
     tabular_collate_fn,
 )
+
 
 D_MODEL, N_HEADS, N_LAYERS = 16, 2, 2
 
@@ -67,6 +70,29 @@ def test_regressor_forward_and_fit():
     trainer.fit(model, train_dataloaders=loader, val_dataloaders=loader)
 
 
+def test_hl_gauss_regressor_predicts_scalar_values():
+    df = _toy_df()
+    cfg = SingleRowConfig.generate(df, target="target")
+    loader = DataLoader(
+        TabularDS(df, cfg), batch_size=16, collate_fn=tabular_collate_fn
+    )
+    model = SingleRowRegressor(
+        cfg,
+        d_model=D_MODEL,
+        n_heads=N_HEADS,
+        n_layers=N_LAYERS,
+        loss="hl_gauss",
+        hl_gauss_bins=17,
+    )
+    batch = next(iter(loader))
+    logits = model(batch)
+    pred = model.predict_value(batch)
+    assert isinstance(model.loss_fn, HLGaussLoss)
+    assert logits.shape == (16, 17)
+    assert pred.shape == (16, 1)
+    assert torch.isfinite(pred).all()
+
+
 def test_mtm_forward_and_transfer():
     df = _toy_df()
     cfg_mtm = SingleRowConfig.generate(df.drop(columns=["target"]))
@@ -84,13 +110,22 @@ def test_mtm_forward_and_transfer():
     reg = SingleRowRegressor(
         cfg_reg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS
     )
-    before = reg.model.tabular_encoder.layers[0].attn.in_proj_weight.clone()
+    before = reg.model.tabular_encoder.layers[0].attn.q_proj.weight.clone()
     transfer_encoder(mtm, reg)
-    after = reg.model.tabular_encoder.layers[0].attn.in_proj_weight
-    assert torch.allclose(
-        after, mtm.model.tabular_encoder.layers[0].attn.in_proj_weight
-    )
+    after = reg.model.tabular_encoder.layers[0].attn.q_proj.weight
+    assert torch.allclose(after, mtm.model.tabular_encoder.layers[0].attn.q_proj.weight)
     assert not torch.allclose(before, after)  # weights actually changed
+
+
+def test_mtm_numeric_only_uses_masked_cells_only():
+    df = _toy_df().drop(columns=["cat", "target"])
+    cfg = SingleRowConfig.generate(df)
+    ds = TabularDS(df, cfg)
+    loader = DataLoader(ds, batch_size=16, collate_fn=masked_tabular_collate_fn)
+    mtm = SingleRowMTM(cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS)
+    batch = next(iter(loader))
+    loss = mtm._step(batch, "train_loss")
+    assert torch.isfinite(loss)
 
 
 def test_mask_tensor_fraction_and_dtype():
@@ -148,3 +183,23 @@ def test_classifier_forward_fit_and_cross_task_transfer():
     reg = SingleRowRegressor(cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS)
     transfer_encoder(reg, clf)  # duck-typed on .model.tabular_encoder
     assert torch.isfinite(clf(batch)).all()
+
+
+def test_oov_categorical_maps_to_unk():
+    train = _toy_df()
+    cfg = SingleRowConfig.generate(train, target="target")
+    test = train.head(2).copy()
+    test.loc[test.index[0], "cat"] = "never_seen"
+    ds = TabularDS(test, cfg)
+    unk = cfg.token_dict["[UNK]"]
+    assert int(ds[0].inputs.categorical[0]) == unk
+
+
+def test_logit_adjustment_changes_loss():
+    logits = torch.zeros(4, 2)
+    target = torch.tensor([0, 1, 1, 1])
+    plain = LogitAdjustedCrossEntropy(class_priors=None)(logits, target)
+    adjusted = LogitAdjustedCrossEntropy(class_priors=[0.75, 0.25], tau=1.0)(
+        logits, target
+    )
+    assert adjusted != plain

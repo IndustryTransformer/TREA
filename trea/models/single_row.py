@@ -24,7 +24,6 @@ Pieces:
 import math
 
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -36,7 +35,7 @@ class NumericCategoricalData:
     """A single-row batch: numeric features and (optional) categorical features."""
 
     numeric: torch.Tensor
-    categorical: Optional[torch.Tensor] = None
+    categorical: torch.Tensor | None = None
 
     def to(self, device):
         self.numeric = self.numeric.to(device)
@@ -47,7 +46,7 @@ class NumericCategoricalData:
 
 def initialize_parameters(module):
     """Xavier for linears, scaled-normal for embeddings, standard for layernorm."""
-    if isinstance(module, (nn.Linear, nn.Conv2d)):
+    if isinstance(module, nn.Linear | nn.Conv2d):
         nn.init.xavier_uniform_(module.weight, gain=1)
         if module.bias is not None:
             nn.init.constant_(module.bias, 0.0)
@@ -60,14 +59,45 @@ def initialize_parameters(module):
         nn.init.zeros_(module.bias)
 
 
-class TransformerEncoderLayer(nn.Module):
-    """Standard post-norm transformer block (cross- or self-attention via q,k,v)."""
+class QKNormAttention(nn.Module):
+    """Multi-head attention with per-head query/key normalization."""
 
     def __init__(self, d_model, n_heads, dropout=0.2):
         super().__init__()
-        self.attn = nn.MultiheadAttention(
-            d_model, n_heads, batch_first=True, dropout=dropout
-        )
+        if d_model % n_heads != 0:
+            raise ValueError("d_model must be divisible by n_heads")
+        self.n_heads = n_heads
+        self.head_dim = d_model // n_heads
+        self.scale = self.head_dim**-0.5
+        self.q_proj = nn.Linear(d_model, d_model)
+        self.k_proj = nn.Linear(d_model, d_model)
+        self.v_proj = nn.Linear(d_model, d_model)
+        self.q_norm = nn.LayerNorm(self.head_dim)
+        self.k_norm = nn.LayerNorm(self.head_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.out_proj = nn.Linear(d_model, d_model)
+
+    def _split(self, x):
+        b, t, _ = x.shape
+        return x.view(b, t, self.n_heads, self.head_dim).transpose(1, 2)
+
+    def forward(self, q, k, v):
+        qh = self.q_norm(self._split(self.q_proj(q)))
+        kh = self.k_norm(self._split(self.k_proj(k)))
+        vh = self._split(self.v_proj(v))
+        scores = torch.matmul(qh, kh.transpose(-2, -1)) * self.scale
+        weights = self.dropout(F.softmax(scores, dim=-1))
+        out = torch.matmul(weights, vh).transpose(1, 2).contiguous()
+        out = out.view(q.shape[0], q.shape[1], self.n_heads * self.head_dim)
+        return self.out_proj(out)
+
+
+class TransformerEncoderLayer(nn.Module):
+    """Pre-norm transformer block with QK-normalized attention."""
+
+    def __init__(self, d_model, n_heads, dropout=0.2):
+        super().__init__()
+        self.attn = QKNormAttention(d_model, n_heads, dropout=dropout)
         self.feed_forward = nn.Sequential(
             nn.Linear(d_model, 4 * d_model),
             nn.GELU(),
@@ -79,9 +109,11 @@ class TransformerEncoderLayer(nn.Module):
         self.apply(initialize_parameters)
 
     def forward(self, q, k, v):
-        attn_out, _ = self.attn(q, k, v)
-        out1 = self.norm1(q + attn_out)
-        return self.norm2(out1 + self.feed_forward(out1))
+        qn = self.norm1(q)
+        kn = self.norm1(k)
+        vn = self.norm1(v)
+        out1 = q + self.attn(qn, kn, vn)
+        return out1 + self.feed_forward(self.norm2(out1))
 
 
 class TabularEncoder(nn.Module):
@@ -167,9 +199,8 @@ class TabularEncoder(nn.Module):
             col_emb = self.embeddings(self.col_indices.unsqueeze(0).expand(b, -1))
 
         # Numeric value token = column identity + dense projection of [value, present].
-        # Any NON-FINITE input (NaN or +/-inf) is treated as MISSING: present=0, value 0,
-        # so missingness is learned by the projection (no special token) and identity is
-        # never lost. Raw NaN from data is handled natively -- no pre-conversion required.
+        # Any NON-FINITE input is treated as MISSING: present=0, value 0.
+        # Missingness is learned by the projection and identity is never lost.
         missing = ~torch.isfinite(num_inputs)  # [b, n_num]: NaN or inf -> missing
         present = (~missing).to(num_inputs.dtype)
         vals = torch.where(missing, torch.zeros_like(num_inputs), num_inputs)
@@ -231,6 +262,7 @@ class TabularRegressor(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        output_dim=1,
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -251,7 +283,7 @@ class TabularRegressor(nn.Module):
             nn.Linear(2 * d_model, 2 * d_model),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(2 * d_model, 1),
+            nn.Linear(2 * d_model, output_dim),
         )
 
     def forward(self, num_inputs, cat_inputs):
@@ -349,7 +381,7 @@ class MaskedTabularEncoder(nn.Module):
         return NumericCategoricalData(numeric=num_out, categorical=cat_out)
 
 
-def mask_tensor(tensor, encoder, keep_prob=0.7):
+def mask_tensor(tensor, encoder, keep_prob=0.7, return_mask=False):
     """Corrected fixed-probability masking: mask each cell where rand > keep_prob.
 
     Numeric cells become -inf (the encoder maps that to the numeric-mask embedding);
@@ -362,4 +394,6 @@ def mask_tensor(tensor, encoder, keep_prob=0.7):
         tensor[bit_mask] = float("-inf")
     else:
         tensor[bit_mask] = encoder.cat_mask_token.to(tensor.device)
+    if return_mask:
+        return tensor, bit_mask
     return tensor

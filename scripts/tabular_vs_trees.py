@@ -1,16 +1,14 @@
-"""Head-to-head: single-row deep model vs XGBoost / RandomForest across the tabular corpus.
+"""Head-to-head: single-row deep model vs tree baselines.
 
-The goal-1 bar: is the deep model "as good as trees, in error bands"? Regression -> test
-RMSE (original target units), classification -> test macro-F1. Multi-seed mean+-std per
-model per dataset, then an aggregate: on how many datasets does the deep model TIE-OR-BEAT
-the best tree (within one deep std -> "not significantly worse")?
+The goal-1 bar: is the deep model "as good as trees, in error bands"?
+Regression -> test RMSE (original target units), classification -> test macro-F1.
+Multi-seed mean+-std per model per dataset, then an aggregate: on how many
+datasets does the deep model TIE-OR-BEAT the best tree?
 
 Notes:
-  - Deep = from-scratch SingleRowRegressor / SingleRowClassifier (MTM pretraining is the
-    next lever but needs the no-categorical MTM fix; this is the honest scratch baseline).
-  - Missing cells: the deep model handles NaN natively (present-flag); trees get the same
-    standardized features with NaN mean-imputed (post-standardization 0). Features clipped
-    to +-8 to tame outliers.
+  - Deep = from-scratch SingleRowRegressor / SingleRowClassifier.
+  - Missing cells: the deep model handles NaN natively (present-flag); trees get
+    the same standardized features with NaN mean-imputed after standardization.
   - Metrics are direction-aware (RMSE lower-better, macro-F1 higher-better).
 
 Run (trains many models; progress off):
@@ -73,7 +71,7 @@ def load_corpus(tasks):
 
 
 def prep(df, feat, task, seed):
-    """Split + standardize (clip +-8, NaN kept); label-encode a classification target."""
+    """Split, standardize, and label-encode classification targets."""
     strat = df["__target__"] if task == "classification" else None
     tr, te = train_test_split(df, test_size=0.3, random_state=seed, stratify=strat)
     mu, sd = tr[feat].mean(), tr[feat].std().replace(0, 1)
@@ -101,7 +99,21 @@ def _frame(X, y, feat):
 
 
 def deep_score(
-    Xtr, ytr, Xte, yte, feat, task, n_classes, tscale, seed, epochs=100, patience=8
+    Xtr,
+    ytr,
+    Xte,
+    yte,
+    feat,
+    task,
+    n_classes,
+    tscale,
+    seed,
+    epochs=256,
+    patience=None,
+    regression_loss="mse",
+    label_smoothing=0.05,
+    logit_adjust_tau=1.0,
+    warmup_frac=0.1,
 ):
     L.seed_everything(seed, verbose=False)
     fit_i, val_i = train_test_split(
@@ -118,11 +130,26 @@ def deep_score(
             ds, batch_size=BATCH, shuffle=shuffle, collate_fn=tabular_collate_fn
         )
 
+    train_batches = max(1, int(np.ceil(len(fit_i) / BATCH)))
+    warmup_steps = int(train_batches * epochs * warmup_frac)
+
     if task == "regression":
+        y_min, y_max = float(np.nanmin(ytr[fit_i])), float(np.nanmax(ytr[fit_i]))
         model = SingleRowRegressor(
-            cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS, lr=LR
+            cfg,
+            d_model=D_MODEL,
+            n_heads=N_HEADS,
+            n_layers=N_LAYERS,
+            lr=LR,
+            loss=regression_loss,
+            hl_gauss_min=y_min,
+            hl_gauss_max=y_max,
+            warmup_steps=warmup_steps,
         )
+        monitor, mode = "val_loss", "min"
     else:
+        counts = np.bincount(ytr[fit_i], minlength=n_classes).astype(np.float32)
+        priors = counts / counts.sum()
         model = SingleRowClassifier(
             cfg,
             num_classes=n_classes,
@@ -130,12 +157,19 @@ def deep_score(
             n_heads=N_HEADS,
             n_layers=N_LAYERS,
             lr=LR,
+            class_priors=priors,
+            logit_adjust_tau=logit_adjust_tau,
+            label_smoothing=label_smoothing,
+            warmup_steps=warmup_steps,
         )
-    ckdir = (
-        Path(os.environ["TMPDIR"] if "TMPDIR" in os.environ else "/tmp") / f"tvt_{seed}"
-    )
+        monitor, mode = "val_f1_macro", "max"
+    ckdir = Path(os.environ.get("TMPDIR", "/tmp")) / f"tvt_{seed}"
     trainer, ckpt = build_trainer(
-        max_epochs=epochs, patience=patience, ckpt_dir=str(ckdir)
+        max_epochs=epochs,
+        patience=patience,
+        ckpt_dir=str(ckdir),
+        monitor=monitor,
+        mode=mode,
     )
     trainer.fit(
         model,
@@ -153,12 +187,21 @@ def deep_score(
     preds = []
     with torch.no_grad():
         for b in te_loader:
-            out = model.model(b.inputs.numeric.to(model.device), None)
+            b.inputs = b.inputs.to(model.device)
+            if task == "regression":
+                out = model.predict_value(b)
+            else:
+                out = model.model(b.inputs.numeric, b.inputs.categorical)
             preds.append(out.cpu().numpy())
     P = np.concatenate(preds)
     if task == "regression":
-        return float(np.sqrt(mean_squared_error(yte, P.ravel()))) * tscale
-    return float(f1_score(yte, P.argmax(1), average="macro"))
+        pred = np.clip(P.ravel(), float(np.nanmin(ytr)), float(np.nanmax(ytr)))
+        score = float(np.sqrt(mean_squared_error(yte, pred))) * tscale
+        return score, {"constant_pred": False}
+    pred = P.argmax(1)
+    return float(f1_score(yte, pred, average="macro")), {
+        "constant_pred": bool(np.unique(pred).size <= 1)
+    }
 
 
 def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed):
@@ -203,9 +246,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", nargs="+", default=["regression", "classification"])
     ap.add_argument("--seeds", type=int, default=3)
+    ap.add_argument("--epochs", type=int, default=256)
+    ap.add_argument("--patience", type=int, default=None)
+    ap.add_argument("--regression-loss", choices=["mse", "hl_gauss"], default="mse")
+    ap.add_argument("--label-smoothing", type=float, default=0.05)
+    ap.add_argument("--logit-adjust-tau", type=float, default=1.0)
+    ap.add_argument("--warmup-frac", type=float, default=0.1)
     ap.add_argument("--smoke", action="store_true")
     a = ap.parse_args()
-    epochs, patience = (3, 2) if a.smoke else (100, 8)
+    epochs, patience = (3, None) if a.smoke else (a.epochs, a.patience)
     if a.smoke:
         a.seeds = 2
 
@@ -229,25 +278,29 @@ def main():
         except Exception as e:
             print(f"[{i}] SKIP {name}: {e}", flush=True)
             continue
-        row = {"deep": [], "xgb": [], "rf": []}
+        row = {"deep": [], "xgb": [], "rf": [], "deep_constant_pred": []}
         try:
             for seed in range(a.seeds):
                 Xtr, ytr, Xte, yte, tscale, nc = prep(df, feat, task, seed)
-                row["deep"].append(
-                    deep_score(
-                        Xtr,
-                        ytr,
-                        Xte,
-                        yte,
-                        feat,
-                        task,
-                        nc,
-                        tscale,
-                        seed,
-                        epochs,
-                        patience,
-                    )
+                deep_metric, deep_diag = deep_score(
+                    Xtr,
+                    ytr,
+                    Xte,
+                    yte,
+                    feat,
+                    task,
+                    nc,
+                    tscale,
+                    seed,
+                    epochs,
+                    patience,
+                    regression_loss=a.regression_loss,
+                    label_smoothing=a.label_smoothing,
+                    logit_adjust_tau=a.logit_adjust_tau,
+                    warmup_frac=a.warmup_frac,
                 )
+                row["deep"].append(deep_metric)
+                row["deep_constant_pred"].append(deep_diag["constant_pred"])
                 row["xgb"].append(
                     tree_score("xgb", Xtr, ytr, Xte, yte, task, tscale, seed)
                 )
@@ -268,6 +321,7 @@ def main():
         }
         for k in ("deep", "xgb", "rf"):
             rec[k], rec[k + "_std"] = float(np.mean(row[k])), float(np.std(row[k]))
+        rec["deep_constant_pred_seeds"] = int(sum(row["deep_constant_pred"]))
         results.append(rec)
         RESULTS.write_text(json.dumps(results, indent=2))
         higher = task == "classification"
@@ -278,9 +332,12 @@ def main():
             else (rec["deep"] <= best_tree + rec["deep_std"])
         )
         metric = "F1" if higher else "RMSE"
+        status = "TIE/WIN" if tie else "loss"
         print(
-            f"[{i:>2}] {name:34s} {task[:3]} {metric} deep {rec['deep']:.3f}±{rec['deep_std']:.3f} "
-            f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} | {'TIE/WIN' if tie else 'loss'}",
+            f"[{i:>2}] {name:34s} {task[:3]} {metric} "
+            f"deep {rec['deep']:.3f}±{rec['deep_std']:.3f} "
+            f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} | {status}"
+            f" | const_seeds={rec['deep_constant_pred_seeds']}",
             flush=True,
         )
 
@@ -294,7 +351,7 @@ def main():
             continue
         higher = task == "classification"
 
-        def tie(r):
+        def tie(r, higher=higher):
             bt = max(r["xgb"], r["rf"]) if higher else min(r["xgb"], r["rf"])
             return (
                 (r["deep"] >= bt - r["deep_std"])
@@ -302,14 +359,16 @@ def main():
                 else (r["deep"] <= bt + r["deep_std"])
             )
 
-        def win(r):
+        def win(r, higher=higher):
             bt = max(r["xgb"], r["rf"]) if higher else min(r["xgb"], r["rf"])
             return (r["deep"] > bt) if higher else (r["deep"] < bt)
 
         n = len(rows)
+        n_tie = sum(tie(r) for r in rows)
+        n_win = sum(win(r) for r in rows)
         print(
-            f"  {task:14s} n={n:>2} | deep ties-or-beats best tree on {sum(tie(r) for r in rows)}/{n}"
-            f" | strictly beats on {sum(win(r) for r in rows)}/{n}",
+            f"  {task:14s} n={n:>2} | deep ties-or-beats best tree "
+            f"on {n_tie}/{n} | strictly beats on {n_win}/{n}",
             flush=True,
         )
     print(f"\nresults -> {RESULTS}", flush=True)
