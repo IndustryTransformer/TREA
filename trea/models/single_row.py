@@ -24,7 +24,6 @@ Pieces:
 import math
 
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -36,7 +35,7 @@ class NumericCategoricalData:
     """A single-row batch: numeric features and (optional) categorical features."""
 
     numeric: torch.Tensor
-    categorical: Optional[torch.Tensor] = None
+    categorical: torch.Tensor | None = None
 
     def to(self, device):
         self.numeric = self.numeric.to(device)
@@ -47,7 +46,7 @@ class NumericCategoricalData:
 
 def initialize_parameters(module):
     """Xavier for linears, scaled-normal for embeddings, standard for layernorm."""
-    if isinstance(module, (nn.Linear, nn.Conv2d)):
+    if isinstance(module, nn.Linear | nn.Conv2d):
         nn.init.xavier_uniform_(module.weight, gain=1)
         if module.bias is not None:
             nn.init.constant_(module.bias, 0.0)
@@ -61,13 +60,29 @@ def initialize_parameters(module):
 
 
 class TransformerEncoderLayer(nn.Module):
-    """Standard post-norm transformer block (cross- or self-attention via q,k,v)."""
+    """Transformer block with optional pre-norm and QK-normalized attention."""
 
-    def __init__(self, d_model, n_heads, dropout=0.2):
+    def __init__(
+        self,
+        d_model,
+        n_heads,
+        dropout=0.2,
+        qk_norm: bool = True,
+        pre_norm: bool = True,
+    ):
         super().__init__()
+        self.n_heads = n_heads
+        self.head_dim = d_model // n_heads
+        if self.head_dim * n_heads != d_model:
+            raise ValueError("d_model must be divisible by n_heads")
+        self.qk_norm = qk_norm
+        self.pre_norm = pre_norm
         self.attn = nn.MultiheadAttention(
             d_model, n_heads, batch_first=True, dropout=dropout
         )
+        if qk_norm:
+            self.q_norm = nn.LayerNorm(self.head_dim)
+            self.k_norm = nn.LayerNorm(self.head_dim)
         self.feed_forward = nn.Sequential(
             nn.Linear(d_model, 4 * d_model),
             nn.GELU(),
@@ -76,10 +91,49 @@ class TransformerEncoderLayer(nn.Module):
         )
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
+        self.last_attn_entropy: torch.Tensor | None = None
         self.apply(initialize_parameters)
 
+    def _attention(self, q, k, v):
+        if not self.qk_norm:
+            attn_out, attn_weights = self.attn(
+                q, k, v, need_weights=True, average_attn_weights=False
+            )
+            probs = attn_weights.detach().clamp_min(1e-12)
+            self.last_attn_entropy = -(probs * probs.log()).sum(dim=-1).mean(dim=(0, 2))
+            return attn_out
+
+        b = q.size(0)
+        q_proj, k_proj, v_proj = F._in_projection_packed(
+            q, k, v, self.attn.in_proj_weight, self.attn.in_proj_bias
+        )
+
+        def split_heads(x):
+            return x.view(b, x.size(1), self.n_heads, self.head_dim).transpose(1, 2)
+
+        qh = self.q_norm(split_heads(q_proj))
+        kh = self.k_norm(split_heads(k_proj))
+        vh = split_heads(v_proj)
+        scores = torch.matmul(qh, kh.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        probs = F.softmax(scores, dim=-1)
+        safe_probs = probs.detach().clamp_min(1e-12)
+        self.last_attn_entropy = (
+            -(safe_probs * safe_probs.log()).sum(dim=-1).mean(dim=(0, 2))
+        )
+        probs = F.dropout(probs, p=self.attn.dropout, training=self.training)
+        out = torch.matmul(probs, vh)
+        out = out.transpose(1, 2).contiguous().view(b, q.size(1), -1)
+        return self.attn.out_proj(out)
+
     def forward(self, q, k, v):
-        attn_out, _ = self.attn(q, k, v)
+        if self.pre_norm:
+            qn = self.norm1(q)
+            kn = self.norm1(k)
+            vn = self.norm1(v)
+            out1 = q + self._attention(qn, kn, vn)
+            return out1 + self.feed_forward(self.norm2(out1))
+
+        attn_out = self._attention(q, k, v)
         out1 = self.norm1(q + attn_out)
         return self.norm2(out1 + self.feed_forward(out1))
 
@@ -101,6 +155,8 @@ class TabularEncoder(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        qk_norm: bool = True,
+        pre_norm: bool = True,
     ):
         super().__init__()
         self.d_model = d_model
@@ -148,7 +204,13 @@ class TabularEncoder(nn.Module):
 
         self.layers = nn.ModuleList(
             [
-                TransformerEncoderLayer(d_model, n_heads, dropout)
+                TransformerEncoderLayer(
+                    d_model,
+                    n_heads,
+                    dropout,
+                    qk_norm=qk_norm,
+                    pre_norm=pre_norm,
+                )
                 for _ in range(n_layers)
             ]
         )
@@ -167,9 +229,10 @@ class TabularEncoder(nn.Module):
             col_emb = self.embeddings(self.col_indices.unsqueeze(0).expand(b, -1))
 
         # Numeric value token = column identity + dense projection of [value, present].
-        # Any NON-FINITE input (NaN or +/-inf) is treated as MISSING: present=0, value 0,
-        # so missingness is learned by the projection (no special token) and identity is
-        # never lost. Raw NaN from data is handled natively -- no pre-conversion required.
+        # Any NON-FINITE input (NaN or +/-inf) is treated as MISSING:
+        # present=0, value 0, so missingness is learned by the projection
+        # (no special token) and identity is never lost. Raw NaN from data is
+        # handled natively -- no pre-conversion required.
         missing = ~torch.isfinite(num_inputs)  # [b, n_num]: NaN or inf -> missing
         present = (~missing).to(num_inputs.dtype)
         vals = torch.where(missing, torch.zeros_like(num_inputs), num_inputs)
@@ -231,6 +294,8 @@ class TabularRegressor(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        qk_norm: bool = True,
+        pre_norm: bool = True,
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -241,6 +306,8 @@ class TabularRegressor(nn.Module):
             dropout,
             col_embedder,
             column_descriptions,
+            qk_norm=qk_norm,
+            pre_norm=pre_norm,
         )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)
@@ -277,6 +344,8 @@ class TabularClassifier(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        qk_norm: bool = True,
+        pre_norm: bool = True,
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -287,6 +356,8 @@ class TabularClassifier(nn.Module):
             dropout,
             col_embedder,
             column_descriptions,
+            qk_norm=qk_norm,
+            pre_norm=pre_norm,
         )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)
@@ -315,6 +386,8 @@ class MaskedTabularEncoder(nn.Module):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        qk_norm: bool = True,
+        pre_norm: bool = True,
     ):
         super().__init__()
         self.config = config
@@ -326,6 +399,8 @@ class MaskedTabularEncoder(nn.Module):
             dropout,
             col_embedder,
             column_descriptions,
+            qk_norm=qk_norm,
+            pre_norm=pre_norm,
         )
         flat = config.n_columns * d_model
         self.cat_decoder = nn.Linear(flat, config.n_cat_cols * config.n_tokens)

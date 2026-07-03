@@ -1,16 +1,17 @@
-"""Head-to-head: single-row deep model vs XGBoost / RandomForest across the tabular corpus.
+"""Head-to-head: single-row deep model vs XGBoost / RandomForest.
 
 The goal-1 bar: is the deep model "as good as trees, in error bands"? Regression -> test
 RMSE (original target units), classification -> test macro-F1. Multi-seed mean+-std per
-model per dataset, then an aggregate: on how many datasets does the deep model TIE-OR-BEAT
-the best tree (within one deep std -> "not significantly worse")?
+model per dataset, then an aggregate: on how many datasets does the deep model
+TIE-OR-BEAT the best tree (within one deep std -> "not significantly worse")?
 
 Notes:
   - Deep = from-scratch SingleRowRegressor / SingleRowClassifier (MTM pretraining is the
-    next lever but needs the no-categorical MTM fix; this is the honest scratch baseline).
-  - Missing cells: the deep model handles NaN natively (present-flag); trees get the same
-    standardized features with NaN mean-imputed (post-standardization 0). Features clipped
-    to +-8 to tame outliers.
+    next lever but needs the no-categorical MTM fix; this is the honest scratch
+    baseline).
+  - Missing cells: the deep model handles NaN natively (present-flag); trees get
+    the same standardized features with NaN mean-imputed (post-standardization 0).
+    Features clipped to +-8 to tame outliers.
   - Metrics are direction-aware (RMSE lower-better, macro-F1 higher-better).
 
 Run (trains many models; progress off):
@@ -73,7 +74,7 @@ def load_corpus(tasks):
 
 
 def prep(df, feat, task, seed):
-    """Split + standardize (clip +-8, NaN kept); label-encode a classification target."""
+    """Split + standardize, with NaN kept; label-encode classification target."""
     strat = df["__target__"] if task == "classification" else None
     tr, te = train_test_split(df, test_size=0.3, random_state=seed, stratify=strat)
     mu, sd = tr[feat].mean(), tr[feat].std().replace(0, 1)
@@ -98,6 +99,19 @@ def _frame(X, y, feat):
     df = pd.DataFrame(X, columns=feat)
     df["__target__"] = y
     return df
+
+
+def _class_priors(y, n_classes):
+    counts = np.bincount(y, minlength=n_classes).astype(np.float32)
+    counts = np.maximum(counts, 1.0)
+    return counts / counts.sum()
+
+
+def _prediction_entropy(pred, n_classes):
+    counts = np.bincount(pred, minlength=n_classes).astype(np.float64)
+    probs = counts / max(1.0, counts.sum())
+    nz = probs[probs > 0]
+    return float(-(nz * np.log(nz)).sum())
 
 
 def deep_score(
@@ -130,10 +144,9 @@ def deep_score(
             n_heads=N_HEADS,
             n_layers=N_LAYERS,
             lr=LR,
+            class_priors=_class_priors(ytr[fit_i], n_classes),
         )
-    ckdir = (
-        Path(os.environ["TMPDIR"] if "TMPDIR" in os.environ else "/tmp") / f"tvt_{seed}"
-    )
+    ckdir = Path(os.environ.get("TMPDIR", "/tmp")) / f"tvt_{seed}"
     trainer, ckpt = build_trainer(
         max_epochs=epochs, patience=patience, ckpt_dir=str(ckdir)
     )
@@ -279,8 +292,10 @@ def main():
         )
         metric = "F1" if higher else "RMSE"
         print(
-            f"[{i:>2}] {name:34s} {task[:3]} {metric} deep {rec['deep']:.3f}±{rec['deep_std']:.3f} "
-            f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} | {'TIE/WIN' if tie else 'loss'}",
+            f"[{i:>2}] {name:34s} {task[:3]} {metric} "
+            f"deep {rec['deep']:.3f}±{rec['deep_std']:.3f} "
+            f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} "
+            f"| {'TIE/WIN' if tie else 'loss'}",
             flush=True,
         )
 
@@ -294,7 +309,7 @@ def main():
             continue
         higher = task == "classification"
 
-        def tie(r):
+        def tie(r, higher=higher):
             bt = max(r["xgb"], r["rf"]) if higher else min(r["xgb"], r["rf"])
             return (
                 (r["deep"] >= bt - r["deep_std"])
@@ -302,14 +317,16 @@ def main():
                 else (r["deep"] <= bt + r["deep_std"])
             )
 
-        def win(r):
+        def win(r, higher=higher):
             bt = max(r["xgb"], r["rf"]) if higher else min(r["xgb"], r["rf"])
             return (r["deep"] > bt) if higher else (r["deep"] < bt)
 
         n = len(rows)
+        n_tie = sum(tie(r) for r in rows)
+        n_win = sum(win(r) for r in rows)
         print(
-            f"  {task:14s} n={n:>2} | deep ties-or-beats best tree on {sum(tie(r) for r in rows)}/{n}"
-            f" | strictly beats on {sum(win(r) for r in rows)}/{n}",
+            f"  {task:14s} n={n:>2} | deep ties-or-beats best tree on "
+            f"{n_tie}/{n} | strictly beats on {n_win}/{n}",
             flush=True,
         )
     print(f"\nresults -> {RESULTS}", flush=True)

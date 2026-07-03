@@ -10,12 +10,13 @@ build_trainer       -- Trainer with early-stopping + best-val checkpointing bake
 """
 
 import os
-from typing import Optional
 
 import pytorch_lightning as L
 import torch
+
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch import nn
+from torchmetrics.classification import MulticlassF1Score
 
 from trea.models.single_row import (
     MaskedTabularEncoder,
@@ -24,6 +25,75 @@ from trea.models.single_row import (
     mask_tensor,
 )
 from trea.utils.single_row_data import InputsTarget
+
+
+def adamw_parameter_groups(module: nn.Module, weight_decay: float):
+    """AdamW groups: decay regular weights, never embeddings/norms/biases."""
+    no_decay_modules = (nn.Embedding, nn.LayerNorm)
+    no_decay_ids = set()
+    for child in module.modules():
+        if isinstance(child, no_decay_modules):
+            no_decay_ids.update(id(p) for p in child.parameters(recurse=False))
+
+    decay_params, no_decay_params = [], []
+    decay_names, no_decay_names = [], []
+    for name, param in module.named_parameters():
+        if not param.requires_grad:
+            continue
+        if name.endswith(".bias") or name == "bias" or id(param) in no_decay_ids:
+            no_decay_params.append(param)
+            no_decay_names.append(name)
+        else:
+            decay_params.append(param)
+            decay_names.append(name)
+
+    return [
+        {
+            "params": decay_params,
+            "weight_decay": weight_decay,
+            "names": decay_names,
+        },
+        {
+            "params": no_decay_params,
+            "weight_decay": 0.0,
+            "names": no_decay_names,
+        },
+    ]
+
+
+def _configure_adamw(module: L.LightningModule):
+    opt = torch.optim.AdamW(
+        adamw_parameter_groups(module, module.weight_decay),
+        lr=module.lr,
+        betas=(0.9, 0.95),
+    )
+    if module.warmup_frac <= 0:
+        return opt
+    total_steps = max(1, int(module.trainer.estimated_stepping_batches))
+    warmup_steps = max(1, int(total_steps * module.warmup_frac))
+
+    def lr_lambda(step):
+        return min(1.0, float(step + 1) / float(warmup_steps))
+
+    sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda=lr_lambda)
+    return {
+        "optimizer": opt,
+        "lr_scheduler": {"scheduler": sched, "interval": "step"},
+    }
+
+
+def _log_attention_entropy(module: L.LightningModule, encoder, prefix: str):
+    for layer_i, layer in enumerate(encoder.layers):
+        entropy = layer.last_attn_entropy
+        if entropy is None:
+            continue
+        for head_i, value in enumerate(entropy):
+            module.log(
+                f"{prefix}_attn_entropy_l{layer_i}_h{head_i}",
+                value,
+                on_step=False,
+                on_epoch=True,
+            )
 
 
 class SingleRowRegressor(L.LightningModule):
@@ -97,10 +167,20 @@ class SingleRowClassifier(L.LightningModule):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        class_priors=None,
+        logit_adjustment_tau: float = 1.0,
+        label_smoothing: float = 0.0,
+        qk_norm: bool = True,
+        pre_norm: bool = True,
+        warmup_frac: float = 0.05,
+        weight_decay: float = 3e-4,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
         self.lr = lr
+        self.warmup_frac = warmup_frac
+        self.weight_decay = weight_decay
+        self.logit_adjustment_tau = logit_adjustment_tau
         self.model = TabularClassifier(
             config,
             num_classes,
@@ -110,16 +190,56 @@ class SingleRowClassifier(L.LightningModule):
             dropout,
             col_embedder,
             column_descriptions,
+            qk_norm=qk_norm,
+            pre_norm=pre_norm,
         )
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_fn = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+        priors = (
+            torch.as_tensor(class_priors, dtype=torch.float32)
+            if class_priors is not None
+            else torch.ones(num_classes, dtype=torch.float32) / num_classes
+        )
+        priors = priors.clamp_min(1e-12)
+        priors = priors / priors.sum()
+        self.register_buffer("class_log_priors", priors.log())
+        self.val_macro_f1 = MulticlassF1Score(num_classes=num_classes, average="macro")
+        self.register_buffer(
+            "val_pred_counts", torch.zeros(num_classes, dtype=torch.float32)
+        )
 
     def forward(self, batch: InputsTarget):
         return self.model(batch.inputs.numeric, batch.inputs.categorical)
 
+    def training_logits(self, logits):
+        if self.logit_adjustment_tau == 0:
+            return logits
+        return logits + self.logit_adjustment_tau * self.class_log_priors
+
+    def posthoc_adjust_logits(self, logits, tau: float | None = None):
+        tau = self.logit_adjustment_tau if tau is None else tau
+        if tau == 0:
+            return logits
+        return logits - tau * self.class_log_priors
+
     def _step(self, batch, name):
         logits = self.model(batch.inputs.numeric, batch.inputs.categorical)
-        loss = self.loss_fn(logits, batch.target.long().view(-1))
+        target = batch.target.long().view(-1)
+        loss = self.loss_fn(self.training_logits(logits), target)
         self.log(name, loss, prog_bar=(name == "val_loss"))
+        if name == "val_loss":
+            preds = logits.argmax(dim=1)
+            self.val_macro_f1.update(preds, target)
+            self.log(
+                "val_macro_f1",
+                self.val_macro_f1,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.val_pred_counts += torch.bincount(
+                preds, minlength=self.val_pred_counts.numel()
+            ).to(self.val_pred_counts)
+            _log_attention_entropy(self, self.model.tabular_encoder, "val")
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -235,9 +355,11 @@ def copy_encoder_weights(src_encoder, dst_encoder, include_col_embedder: bool = 
 
 def build_trainer(
     max_epochs: int = 100,
-    patience: Optional[int] = 8,
-    ckpt_dir: Optional[str] = None,
+    patience: int | None = 16,
+    ckpt_dir: str | None = None,
     grad_clip: float = 1.0,
+    monitor: str = "val_loss",
+    mode: str = "min",
 ):
     """Trainer with early-stopping (if patience set) and best-val checkpointing.
 
@@ -246,14 +368,12 @@ def build_trainer(
     """
     callbacks = []
     if patience is not None:
-        callbacks.append(
-            EarlyStopping(monitor="val_loss", patience=patience, mode="min")
-        )
+        callbacks.append(EarlyStopping(monitor=monitor, patience=patience, mode=mode))
     ckpt = None
     if ckpt_dir is not None:
         ckpt = ModelCheckpoint(
-            monitor="val_loss",
-            mode="min",
+            monitor=monitor,
+            mode=mode,
             save_top_k=1,
             dirpath=ckpt_dir,
             filename="best",
