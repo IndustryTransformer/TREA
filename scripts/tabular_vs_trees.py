@@ -134,6 +134,7 @@ def deep_score(
     label_smoothing=0.0,
     logit_adjustment_tau=1.0,
     warmup_frac=0.05,
+    ensemble_k=0,
 ):
     L.seed_everything(seed, verbose=False)
     fit_i, val_i = train_test_split(
@@ -164,6 +165,7 @@ def deep_score(
             value_encoder=value_encoder,
             fusion=fusion,
             warmup_frac=warmup_frac,
+            ensemble_k=ensemble_k,
         )
     else:
         model = SingleRowClassifier(
@@ -179,6 +181,7 @@ def deep_score(
             value_encoder=value_encoder,
             fusion=fusion,
             warmup_frac=warmup_frac,
+            ensemble_k=ensemble_k,
         )
     ckdir = Path(os.environ.get("TMPDIR", "/tmp")) / f"tvt_{seed}"
     trainer, ckpt = build_trainer(
@@ -206,9 +209,13 @@ def deep_score(
         for b in te_loader:
             b.inputs = b.inputs.to(model.device)
             if task == "regression":
+                # predict_value averages ensemble members and applies the HL-Gauss
+                # expected value when that head is active (no-op when ensemble_k == 0).
                 out = model.predict_value(b)
             else:
-                out = model.model(b.inputs.numeric, b.inputs.categorical)
+                # predict() averages member softmaxes -> [b, C] probabilities
+                # (a no-op softmax of the single model when ensemble_k == 0).
+                out = model.model.predict(b.inputs.numeric, b.inputs.categorical)
             preds.append(out.cpu().numpy())
     P = np.concatenate(preds)
     if task == "regression":
@@ -278,7 +285,14 @@ def main():
     ap.add_argument("--label-smoothing", type=float, default=0.0)
     ap.add_argument("--logit-adjustment-tau", type=float, default=1.0)
     ap.add_argument("--warmup-frac", type=float, default=0.05)
+    ap.add_argument("--ensemble-k", type=int, default=0)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument(
+        "--ensemble-k",
+        type=int,
+        default=0,
+        help="TabM-mini BatchEnsemble members (0=off; 32 recommended).",
+    )
     a = ap.parse_args()
     epochs, patience = (3, 2) if a.smoke else (100, 16)
     if a.smoke:
@@ -291,7 +305,8 @@ def main():
             pick += [m for m in datasets if m["task"] == t][:2]
         datasets = pick
     print(
-        f"datasets={len(datasets)} | tasks={a.tasks} | seeds={a.seeds} | device="
+        f"datasets={len(datasets)} | tasks={a.tasks} | seeds={a.seeds} | "
+        f"ensemble_k={a.ensemble_k} | device="
         f"{'cuda' if torch.cuda.is_available() else 'cpu'}",
         flush=True,
     )
@@ -328,6 +343,7 @@ def main():
                     label_smoothing=a.label_smoothing,
                     logit_adjustment_tau=a.logit_adjustment_tau,
                     warmup_frac=a.warmup_frac,
+                    ensemble_k=a.ensemble_k,
                 )
                 xgb = tree_score("xgb", Xtr, ytr, Xte, yte, task, tscale, seed)
                 rf = tree_score("rf", Xtr, ytr, Xte, yte, task, tscale, seed)

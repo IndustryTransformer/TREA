@@ -177,6 +177,7 @@ class SingleRowRegressor(L.LightningModule):
         fusion: str = "additive",
         warmup_frac: float = 0.05,
         weight_decay: float = 3e-4,
+        ensemble_k=0,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
@@ -197,6 +198,7 @@ class SingleRowRegressor(L.LightningModule):
             output_dim=output_dim,
             value_encoder=value_encoder,
             fusion=fusion,
+            ensemble_k=ensemble_k,
         )
         if head == "hl_gauss":
             if y_train is None:
@@ -212,11 +214,18 @@ class SingleRowRegressor(L.LightningModule):
             self.loss_fn = nn.MSELoss()
 
     def forward(self, batch: InputsTarget):
-        return self.model(batch.inputs.numeric, batch.inputs.categorical)
+        return self.model.predict(batch.inputs.numeric, batch.inputs.categorical)
 
     def _step(self, batch, name):
         out = self.model(batch.inputs.numeric, batch.inputs.categorical)
-        loss = self.loss_fn(out, batch.target)
+        if out.dim() == 3:
+            # Ensembled: [b, k, out]. Loss = mean of the k members' MSE (each member
+            # regresses the shared target); a plain mean over the broadcast target is
+            # exactly that average.
+            target = batch.target.unsqueeze(1).expand_as(out)
+        else:
+            target = batch.target
+        loss = self.loss_fn(out, target)
         self.log(name, loss, prog_bar=(name == "val_loss"))
         if name == "val_loss":
             _log_attention_entropy(self, self.model.tabular_encoder, "val")
@@ -233,6 +242,8 @@ class SingleRowRegressor(L.LightningModule):
 
     def predict_value(self, batch: InputsTarget):
         out = self.model(batch.inputs.numeric, batch.inputs.categorical)
+        if out.dim() == 3:  # ensembled [b, k, out] -> average members
+            out = out.mean(dim=1)
         if isinstance(self.loss_fn, HLGaussLoss):
             return self.loss_fn.expected_value(out)
         return out
@@ -266,6 +277,7 @@ class SingleRowClassifier(L.LightningModule):
         fusion: str = "additive",
         warmup_frac: float = 0.05,
         weight_decay: float = 3e-4,
+        ensemble_k=0,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
@@ -286,6 +298,7 @@ class SingleRowClassifier(L.LightningModule):
             pre_norm=pre_norm,
             value_encoder=value_encoder,
             fusion=fusion,
+            ensemble_k=ensemble_k,
         )
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
         priors = (
@@ -302,6 +315,8 @@ class SingleRowClassifier(L.LightningModule):
         )
 
     def forward(self, batch: InputsTarget):
+        # Raw logits (logit-adjustment + CE consume these). Ensemble-averaged class
+        # probabilities are available via ``self.model.predict(...)`` for inference.
         return self.model(batch.inputs.numeric, batch.inputs.categorical)
 
     def training_logits(self, logits):
@@ -318,10 +333,25 @@ class SingleRowClassifier(L.LightningModule):
     def _step(self, batch, name):
         logits = self.model(batch.inputs.numeric, batch.inputs.categorical)
         target = batch.target.long().view(-1)
-        loss = self.loss_fn(self.training_logits(logits), target)
+        if logits.dim() == 3:
+            # Ensembled: [b, k, C]. Flatten to [b*k, C] and repeat each target k times
+            # (row order is member-fast, matching the encoder's expand); CE(reduction=
+            # "mean") over that is exactly the mean of the k members' losses. The
+            # logit adjustment (priors, [C]) broadcasts over the member dim first.
+            b, k, c = logits.shape
+            loss = self.loss_fn(
+                self.training_logits(logits).reshape(b * k, c),
+                target.view(b, 1).expand(b, k).reshape(-1),
+            )
+        else:
+            loss = self.loss_fn(self.training_logits(logits), target)
         self.log(name, loss, prog_bar=(name == "val_loss"))
         if name == "val_loss":
-            preds = logits.argmax(dim=1)
+            # Ensemble prediction = argmax of the mean member softmax (else raw argmax).
+            if logits.dim() == 3:
+                preds = logits.softmax(dim=-1).mean(dim=1).argmax(dim=1)
+            else:
+                preds = logits.argmax(dim=1)
             self.val_macro_f1.update(preds, target)
             self.log(
                 "val_macro_f1",
