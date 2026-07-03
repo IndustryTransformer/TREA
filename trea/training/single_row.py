@@ -107,10 +107,16 @@ class SingleRowRegressor(L.LightningModule):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        qk_norm: bool = True,
+        pre_norm: bool = True,
+        warmup_frac: float = 0.05,
+        weight_decay: float = 3e-4,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
         self.lr = lr
+        self.warmup_frac = warmup_frac
+        self.weight_decay = weight_decay
         self.model = TabularRegressor(
             config,
             d_model,
@@ -119,6 +125,8 @@ class SingleRowRegressor(L.LightningModule):
             dropout,
             col_embedder,
             column_descriptions,
+            qk_norm=qk_norm,
+            pre_norm=pre_norm,
         )
         self.loss_fn = nn.MSELoss()
 
@@ -129,6 +137,8 @@ class SingleRowRegressor(L.LightningModule):
         y_hat = self.model(batch.inputs.numeric, batch.inputs.categorical)
         loss = self.loss_fn(y_hat, batch.target)
         self.log(name, loss, prog_bar=(name == "val_loss"))
+        if name == "val_loss":
+            _log_attention_entropy(self, self.model.tabular_encoder, "val")
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -249,14 +259,19 @@ class SingleRowClassifier(L.LightningModule):
         return self._step(batch, "val_loss")
 
     def configure_optimizers(self):
-        opt = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=1e-5)
-        sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            opt, mode="min", factor=0.1, patience=3
-        )
-        return {
-            "optimizer": opt,
-            "lr_scheduler": {"scheduler": sched, "monitor": "val_loss"},
-        }
+        return _configure_adamw(self)
+
+    def on_validation_epoch_start(self):
+        self.val_pred_counts.zero_()
+
+    def on_validation_epoch_end(self):
+        counts = self.val_pred_counts
+        total = counts.sum().clamp_min(1.0)
+        probs = counts / total
+        pred_entropy = -(probs.clamp_min(1e-12) * probs.clamp_min(1e-12).log()).sum()
+        self.log("val_pred_entropy", pred_entropy, on_epoch=True)
+        for class_i, frac in enumerate(probs):
+            self.log(f"val_pred_frac_class_{class_i}", frac, on_epoch=True)
 
 
 class SingleRowMTM(L.LightningModule):
@@ -274,10 +289,16 @@ class SingleRowMTM(L.LightningModule):
         dropout=0.2,
         col_embedder=None,
         column_descriptions=None,
+        qk_norm: bool = True,
+        pre_norm: bool = True,
+        warmup_frac: float = 0.05,
+        weight_decay: float = 3e-4,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
         self.lr = lr
+        self.warmup_frac = warmup_frac
+        self.weight_decay = weight_decay
         self.model = MaskedTabularEncoder(
             config,
             d_model,
@@ -286,6 +307,8 @@ class SingleRowMTM(L.LightningModule):
             dropout,
             col_embedder,
             column_descriptions,
+            qk_norm=qk_norm,
+            pre_norm=pre_norm,
         )
         self.numeric_loss_fn = nn.MSELoss()
         self.categorical_loss_fn = nn.CrossEntropyLoss()
@@ -305,6 +328,8 @@ class SingleRowMTM(L.LightningModule):
         predicted = self.model(num_masked, cat_masked)
         loss = self.aggregate_loss(batch, predicted)
         self.log(name, loss, prog_bar=(name == "val_loss"))
+        if name == "val_loss":
+            _log_attention_entropy(self, self.model.tabular_encoder, "val")
         return loss
 
     def training_step(self, batch, batch_idx):

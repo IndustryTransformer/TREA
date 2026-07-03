@@ -170,8 +170,18 @@ def deep_score(
             preds.append(out.cpu().numpy())
     P = np.concatenate(preds)
     if task == "regression":
-        return float(np.sqrt(mean_squared_error(yte, P.ravel()))) * tscale
-    return float(f1_score(yte, P.argmax(1), average="macro"))
+        return {
+            "score": float(np.sqrt(mean_squared_error(yte, P.ravel()))) * tscale,
+            "collapsed": False,
+        }
+    pred = P.argmax(1)
+    entropy = _prediction_entropy(pred, n_classes)
+    return {
+        "score": float(f1_score(yte, pred, average="macro")),
+        "collapsed": bool(entropy < 1e-8),
+        "prediction_entropy": entropy,
+        "prediction_histogram": np.bincount(pred, minlength=n_classes).tolist(),
+    }
 
 
 def tree_score(kind, Xtr, ytr, Xte, yte, task, tscale, seed):
@@ -242,30 +252,38 @@ def main():
         except Exception as e:
             print(f"[{i}] SKIP {name}: {e}", flush=True)
             continue
-        row = {"deep": [], "xgb": [], "rf": []}
+        row = {"deep": [], "xgb": [], "rf": [], "seed_results": []}
         try:
             for seed in range(a.seeds):
                 Xtr, ytr, Xte, yte, tscale, nc = prep(df, feat, task, seed)
-                row["deep"].append(
-                    deep_score(
-                        Xtr,
-                        ytr,
-                        Xte,
-                        yte,
-                        feat,
-                        task,
-                        nc,
-                        tscale,
-                        seed,
-                        epochs,
-                        patience,
-                    )
+                deep = deep_score(
+                    Xtr,
+                    ytr,
+                    Xte,
+                    yte,
+                    feat,
+                    task,
+                    nc,
+                    tscale,
+                    seed,
+                    epochs,
+                    patience,
                 )
-                row["xgb"].append(
-                    tree_score("xgb", Xtr, ytr, Xte, yte, task, tscale, seed)
-                )
-                row["rf"].append(
-                    tree_score("rf", Xtr, ytr, Xte, yte, task, tscale, seed)
+                xgb = tree_score("xgb", Xtr, ytr, Xte, yte, task, tscale, seed)
+                rf = tree_score("rf", Xtr, ytr, Xte, yte, task, tscale, seed)
+                row["deep"].append(deep["score"])
+                row["xgb"].append(xgb)
+                row["rf"].append(rf)
+                row["seed_results"].append(
+                    {
+                        "seed": seed,
+                        "deep": deep["score"],
+                        "xgb": xgb,
+                        "rf": rf,
+                        "collapsed": bool(deep.get("collapsed", False)),
+                        "prediction_entropy": deep.get("prediction_entropy"),
+                        "prediction_histogram": deep.get("prediction_histogram"),
+                    }
                 )
         except Exception as e:
             print(
@@ -281,6 +299,11 @@ def main():
         }
         for k in ("deep", "xgb", "rf"):
             rec[k], rec[k + "_std"] = float(np.mean(row[k])), float(np.std(row[k]))
+        rec["seed_results"] = row["seed_results"]
+        rec["collapsed"] = any(s["collapsed"] for s in row["seed_results"])
+        rec["collapsed_seeds"] = [
+            s["seed"] for s in row["seed_results"] if s["collapsed"]
+        ]
         results.append(rec)
         RESULTS.write_text(json.dumps(results, indent=2))
         higher = task == "classification"
