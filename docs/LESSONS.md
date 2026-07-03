@@ -49,6 +49,56 @@ The restart pattern thrives on never committing to a verdict. Pre-commit, **per 
 - **KILL** the deep-model line if it beats neither baseline in its own regime → ship the
   semantic-column idea on a simpler backbone and move on.
 
+### 3d. 3W binary well-disjoint gate — ADJUDICATED: FAIL (2026-07-03)
+
+`examples/benchmark_3w_binary.py --split-mode well` (well-grouped split: 1,149 wells →
+919 train / 230 val, no well spans both; 3 seeds; both `trea_triple` and
+`trea_triple_stat_tokens` variants; RF and LOF baselines for context):
+
+| Model | AUC | Anomaly F1 | Macro F1 | Accuracy | Sec/run |
+| ----- | --: | ---------: | -------: | -------: | ------: |
+| trea_triple_stat_tokens | 0.8447 | 0.8832 | 0.6689 | 0.8076 | 393.5 |
+| trea_triple | — | 0.8878 | 0.6658 | 0.8133 | 297.5 |
+| **RF** | **0.9584** | **0.9591** | **0.8202** | **0.9275** | **11.9** |
+| LOF | — | 0.8126 | 0.5032 | 0.6959 | 0.9 |
+
+**Verdict: FAIL, decisively.** RF wins every metric column, not marginally — AUC
+0.958 vs 0.845, macro-F1 0.820 vs 0.669, anomaly-F1 0.959 vs 0.883 — while training
+~33× faster (12s vs ~350s/run). Deep's weak point is the Normal class specifically
+(normal-F1 0.45–0.47 vs RF's 0.68), i.e. it over-predicts anomaly on unseen wells;
+RF's hand-stat features generalize to new wells far better than raw windows do here.
+Both `trea_triple` variants (with and without stat tokens) land within noise of each
+other — stat tokens did not close the gap.
+
+## 3e. §3 KILL CLAUSE TRIGGERED (2026-07-03)
+
+Both pre-registered §3 gates are now adjudicated FAIL:
+- Turbine NOx label-efficiency (§3c/§3b protocol v2, final): **FAIL** — `pre_target`
+  beat best-tree at only 1/4 low fractions and lost to scratch at 1%.
+- 3W binary well-disjoint AUC (§3d): **FAIL** — RF beats deep on every metric.
+
+Per the pre-registered kill clause: **the supervised deep-model line (from-scratch
+and MTM-pretrained `SingleRow*`/`TriplePatchTransformer` models, evaluated head-to-head
+against trees on these two benchmarks) is KILLED.** Do not open a v3 protocol, a new
+backbone variant, or a new benchmark to re-litigate this — that is exactly the
+restart pattern §3 exists to prevent. What survives, per the clause's own instruction
+("ship the semantic-column idea on a simpler backbone") and independent evidence
+gathered in this project:
+- **Semantic column-name transfer** — separately pre-registered and validated
+  5/5 (§3b core mechanism) — is NOT killed; it answers a different question
+  (cross-schema transfer, not single-benchmark deep-vs-trees accuracy) and should
+  ship on whatever backbone is simplest, not necessarily a full transformer.
+- **Native missingness encoding** ([value, present]-flag, no imputation) is
+  architecture-agnostic and cheap to keep regardless of backbone.
+- **The GAUGE foundation-model design** (see memory: tabular-fm-deepdive) rests on a
+  different, untested hypothesis — massive synthetic-prior pretraining, not small-corpus
+  MTM on one dataset — and was never gated by §3. A kill here raises the evidentiary
+  bar for funding it, but does not itself falsify it. Any decision to pursue it should
+  be made explicitly, with its own pre-registered MVP gates, not inherited from this one.
+- **The turbine salvage finding** (target-period SSL beat train-only SSL at every
+  label fraction) is real evidence for transductive adaptation and should inform
+  GAUGE's pretraining design even though the turbine benchmark itself is closed.
+
 > **Pre-registered, revised for feasibility before running (2026-06-29):** the turbine set is
 > single-turbine NOx **regression** (temporal split, not classification), and 3W has only ~40
 > wells so a clean well-disjoint *multiclass* eval is infeasible (rare classes live on 1–2
