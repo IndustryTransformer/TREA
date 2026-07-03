@@ -115,7 +115,25 @@ def _prediction_entropy(pred, n_classes):
 
 
 def deep_score(
-    Xtr, ytr, Xte, yte, feat, task, n_classes, tscale, seed, epochs=100, patience=8
+    Xtr,
+    ytr,
+    Xte,
+    yte,
+    feat,
+    task,
+    n_classes,
+    tscale,
+    seed,
+    epochs=100,
+    patience=16,
+    head="mse",
+    bin_spacing="uniform",
+    symlog=False,
+    value_encoder="identity",
+    fusion="additive",
+    label_smoothing=0.0,
+    logit_adjustment_tau=1.0,
+    warmup_frac=0.05,
 ):
     L.seed_everything(seed, verbose=False)
     fit_i, val_i = train_test_split(
@@ -134,7 +152,18 @@ def deep_score(
 
     if task == "regression":
         model = SingleRowRegressor(
-            cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS, lr=LR
+            cfg,
+            d_model=D_MODEL,
+            n_heads=N_HEADS,
+            n_layers=N_LAYERS,
+            lr=LR,
+            head=head,
+            y_train=ytr[fit_i],
+            bin_spacing=bin_spacing,
+            symlog=symlog,
+            value_encoder=value_encoder,
+            fusion=fusion,
+            warmup_frac=warmup_frac,
         )
     else:
         model = SingleRowClassifier(
@@ -145,6 +174,11 @@ def deep_score(
             n_layers=N_LAYERS,
             lr=LR,
             class_priors=_class_priors(ytr[fit_i], n_classes),
+            logit_adjustment_tau=logit_adjustment_tau,
+            label_smoothing=label_smoothing,
+            value_encoder=value_encoder,
+            fusion=fusion,
+            warmup_frac=warmup_frac,
         )
     ckdir = Path(os.environ.get("TMPDIR", "/tmp")) / f"tvt_{seed}"
     trainer, ckpt = build_trainer(
@@ -170,12 +204,18 @@ def deep_score(
     preds = []
     with torch.no_grad():
         for b in te_loader:
-            out = model.model(b.inputs.numeric.to(model.device), None)
+            b.inputs = b.inputs.to(model.device)
+            if task == "regression":
+                out = model.predict_value(b)
+            else:
+                out = model.model(b.inputs.numeric, b.inputs.categorical)
             preds.append(out.cpu().numpy())
     P = np.concatenate(preds)
     if task == "regression":
+        # WO-5: clip test-time predictions to the observed train target range.
+        pred = np.clip(P.ravel(), float(np.nanmin(ytr)), float(np.nanmax(ytr)))
         return {
-            "score": float(np.sqrt(mean_squared_error(yte, P.ravel()))) * tscale,
+            "score": float(np.sqrt(mean_squared_error(yte, pred))) * tscale,
             "collapsed": False,
         }
     pred = P.argmax(1)
@@ -230,6 +270,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", nargs="+", default=["regression", "classification"])
     ap.add_argument("--seeds", type=int, default=3)
+    ap.add_argument("--head", choices=["mse", "hl_gauss"], default="mse")
+    ap.add_argument("--bin-spacing", choices=["uniform", "quantile"], default="uniform")
+    ap.add_argument("--symlog", action="store_true")
+    ap.add_argument("--value-encoder", choices=["identity", "dual"], default="identity")
+    ap.add_argument("--fusion", choices=["additive", "hadamard"], default="additive")
+    ap.add_argument("--label-smoothing", type=float, default=0.0)
+    ap.add_argument("--logit-adjustment-tau", type=float, default=1.0)
+    ap.add_argument("--warmup-frac", type=float, default=0.05)
     ap.add_argument("--smoke", action="store_true")
     a = ap.parse_args()
     epochs, patience = (3, 2) if a.smoke else (100, 16)
@@ -272,6 +320,14 @@ def main():
                     seed,
                     epochs,
                     patience,
+                    head=a.head,
+                    bin_spacing=a.bin_spacing,
+                    symlog=a.symlog,
+                    value_encoder=a.value_encoder,
+                    fusion=a.fusion,
+                    label_smoothing=a.label_smoothing,
+                    logit_adjustment_tau=a.logit_adjustment_tau,
+                    warmup_frac=a.warmup_frac,
                 )
                 xgb = tree_score("xgb", Xtr, ytr, Xte, yte, task, tscale, seed)
                 rf = tree_score("rf", Xtr, ytr, Xte, yte, task, tscale, seed)

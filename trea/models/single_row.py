@@ -157,11 +157,16 @@ class TabularEncoder(nn.Module):
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
+        value_encoder="identity",
+        fusion="additive",
     ):
         super().__init__()
+        self.config = config
         self.d_model = d_model
-        self.n_numeric_cols = config.n_numeric_cols
         self.n_cat_cols = config.n_cat_cols
+        self.n_numeric_cols = config.n_numeric_cols
+        self.value_encoder = value_encoder
+        self.fusion = fusion
 
         self.embeddings = nn.Embedding(config.n_tokens, d_model)
         self.register_buffer(
@@ -186,21 +191,31 @@ class TabularEncoder(nn.Module):
             ),
         )
 
-        # Optional name-keyed column-identity embedder (semantic transfer). When set,
-        # it supplies the per-column identity vectors keyed by column *name*. The
-        # internal `embeddings` table still serves categorical value tokens (not names).
-        # `column_descriptions` maps a raw column token -> the text actually embedded;
-        # feed descriptions, not terse codes (see column_embeddings.py).
         self.col_embedder = col_embedder
         descr = column_descriptions or {}
         self.col_texts = [descr.get(c, c) for c in col_tokens]
         self.numeric_texts = [descr.get(c, c) for c in config.numeric_col_tokens]
 
-        # Numeric value encoder: project [value, present_flag] into d_model with a
-        # shared dense layer, then ADD the column identity. Never scale the identity
-        # vector by the scalar value -- that collapses to 0 at value 0 (identity lost)
-        # and is scale-sensitive. Shared across columns => transfers across schemas.
-        self.num_value_proj = nn.Linear(2, d_model)
+        if self.value_encoder == "dual":
+            self.n_bins = 64
+            self.ple_bank = nn.Embedding(self.n_bins, d_model)
+            self.periodic_freqs = nn.Parameter(torch.randn(16))
+            self.periodic_bias = nn.Parameter(torch.randn(16))
+            self.num_value_proj = nn.Linear(2 + d_model + 16, d_model)
+            self.missing_vector = nn.Parameter(torch.zeros(d_model + 16))
+            qs = (
+                config.numeric_quantiles
+                if getattr(config, "numeric_quantiles", None) is not None
+                else torch.zeros(config.n_numeric_cols, 65)
+            )
+            self.register_buffer("numeric_quantiles", qs)
+        else:
+            self.num_value_proj = nn.Linear(2, d_model)
+
+        if self.fusion == "hadamard":
+            self.fusion_mlp = nn.Sequential(
+                nn.Linear(d_model, d_model), nn.ReLU(), nn.Linear(d_model, d_model)
+            )
 
         self.layers = nn.ModuleList(
             [
@@ -236,9 +251,30 @@ class TabularEncoder(nn.Module):
         missing = ~torch.isfinite(num_inputs)  # [b, n_num]: NaN or inf -> missing
         present = (~missing).to(num_inputs.dtype)
         vals = torch.where(missing, torch.zeros_like(num_inputs), num_inputs)
-        value_vec = self.num_value_proj(
-            torch.stack([vals, present], dim=-1)
-        )  # [b, n_num, d]
+
+        if self.value_encoder == "dual":
+            continuous = torch.stack([vals, present], dim=-1)
+            # soft PLE
+            x_exp = vals.unsqueeze(-1)
+            qs = self.numeric_quantiles
+            widths = qs[:, 1:] - qs[:, :-1]
+            ple_v = torch.clamp(
+                (x_exp - qs[:, :-1]) / (widths + 1e-8), min=0.0, max=1.0
+            )
+            ple_emb = torch.matmul(ple_v, self.ple_bank.weight)
+            # periodic
+            freqs = self.periodic_freqs.view(1, 1, -1)
+            bias = self.periodic_bias.view(1, 1, -1)
+            periodic_emb = torch.cos(2 * math.pi * freqs * x_exp + bias)
+            # missing fallback
+            discrete = torch.cat([ple_emb, periodic_emb], dim=-1)
+            discrete = torch.where(
+                present.unsqueeze(-1).bool(), discrete, self.missing_vector
+            )
+            concat_all = torch.cat([continuous, discrete], dim=-1)
+            value_vec = self.num_value_proj(concat_all)
+        else:
+            value_vec = self.num_value_proj(torch.stack([vals, present], dim=-1))
 
         if self.col_embedder is not None:
             num_col_emb = (
@@ -248,7 +284,11 @@ class TabularEncoder(nn.Module):
             num_col_emb = self.embeddings(
                 self.numeric_indices.unsqueeze(0).expand(b, -1)
             )
-        base_numeric = num_col_emb + value_vec
+
+        if self.fusion == "hadamard":
+            base_numeric = num_col_emb * self.fusion_mlp(value_vec) + value_vec
+        else:
+            base_numeric = num_col_emb + value_vec
 
         if cat_inputs is not None and self.n_cat_cols > 0:
             cat_emb = self.embeddings(cat_inputs.long())
@@ -296,6 +336,9 @@ class TabularRegressor(nn.Module):
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
+        output_dim=1,
+        value_encoder="identity",
+        fusion="additive",
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -308,6 +351,8 @@ class TabularRegressor(nn.Module):
             column_descriptions,
             qk_norm=qk_norm,
             pre_norm=pre_norm,
+            value_encoder=value_encoder,
+            fusion=fusion,
         )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)
@@ -318,7 +363,7 @@ class TabularRegressor(nn.Module):
             nn.Linear(2 * d_model, 2 * d_model),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(2 * d_model, 1),
+            nn.Linear(2 * d_model, output_dim),
         )
 
     def forward(self, num_inputs, cat_inputs):
@@ -346,6 +391,8 @@ class TabularClassifier(nn.Module):
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
+        value_encoder="identity",
+        fusion="additive",
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -358,6 +405,8 @@ class TabularClassifier(nn.Module):
             column_descriptions,
             qk_norm=qk_norm,
             pre_norm=pre_norm,
+            value_encoder=value_encoder,
+            fusion=fusion,
         )
         self.pooling = AttentionPooling(d_model)
         self.dropout = nn.Dropout(dropout)
@@ -403,7 +452,10 @@ class MaskedTabularEncoder(nn.Module):
             pre_norm=pre_norm,
         )
         flat = config.n_columns * d_model
-        self.cat_decoder = nn.Linear(flat, config.n_cat_cols * config.n_tokens)
+        if config.n_cat_cols > 0:
+            self.cat_decoder = nn.Linear(flat, config.n_cat_cols * config.n_tokens)
+        else:
+            self.cat_decoder = None
         self.num_decoder = nn.Sequential(
             nn.Linear(flat, 4 * d_model),
             nn.GELU(),
@@ -417,24 +469,33 @@ class MaskedTabularEncoder(nn.Module):
     def forward(self, num_inputs, cat_inputs):
         out = self.tabular_encoder(num_inputs, cat_inputs)
         flat = out.reshape(out.size(0), -1)
-        cat_out = self.cat_decoder(flat).view(
-            out.size(0), self.config.n_cat_cols, self.config.n_tokens
-        )
+        if self.config.n_cat_cols > 0 and self.cat_decoder is not None:
+            cat_out = self.cat_decoder(flat).view(
+                out.size(0), self.config.n_cat_cols, self.config.n_tokens
+            )
+        else:
+            cat_out = None
         num_out = self.num_decoder(flat)
         return NumericCategoricalData(numeric=num_out, categorical=cat_out)
 
 
-def mask_tensor(tensor, encoder, keep_prob=0.7):
+def mask_tensor(tensor, encoder, keep_prob=0.7, return_mask=False):
     """Corrected fixed-probability masking: mask each cell where rand > keep_prob.
 
     Numeric cells become -inf (the encoder maps that to the numeric-mask embedding);
     categorical cells become the categorical mask token. Fixes the Hephaestus bug
     where `probability` was bound to batch_idx (degenerate, near-no-op masking).
     """
+    if tensor is None:
+        if return_mask:
+            return None, None
+        return None
     tensor = tensor.clone()
     bit_mask = torch.rand(tensor.shape, device=tensor.device) > keep_prob
-    if tensor.dtype == torch.float32:
+    if tensor.is_floating_point():
         tensor[bit_mask] = float("-inf")
     else:
         tensor[bit_mask] = encoder.cat_mask_token.to(tensor.device)
+    if return_mask:
+        return tensor, bit_mask
     return tensor

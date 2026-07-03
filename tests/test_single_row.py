@@ -8,8 +8,9 @@ import torch
 from sklearn.metrics import f1_score
 from torch.utils.data import DataLoader
 
-from trea.models.single_row import TransformerEncoderLayer, mask_tensor
+from trea.models.single_row import TabularEncoder, TransformerEncoderLayer, mask_tensor
 from trea.training.single_row import (
+    HLGaussLoss,
     SingleRowClassifier,
     SingleRowMTM,
     SingleRowRegressor,
@@ -320,3 +321,159 @@ def test_classifier_trainer_can_checkpoint_on_macro_f1(tmp_path):
     assert early_stop.mode == "max"
     assert ckpt.monitor == "val_macro_f1"
     assert ckpt.mode == "max"
+
+
+def test_hl_gauss_regressor_predicts_scalar_values():
+    df = _toy_df()
+    cfg = SingleRowConfig.generate(df, target="target")
+    loader = DataLoader(
+        TabularDS(df, cfg), batch_size=16, collate_fn=tabular_collate_fn
+    )
+    model = SingleRowRegressor(
+        cfg,
+        d_model=D_MODEL,
+        n_heads=N_HEADS,
+        n_layers=N_LAYERS,
+        head="hl_gauss",
+        y_train=df["target"].values,
+        hl_gauss_bins=17,
+    )
+    batch = next(iter(loader))
+    logits = model(batch)
+    pred = model.predict_value(batch)
+    assert isinstance(model.loss_fn, HLGaussLoss)
+    assert logits.shape == (16, 17)
+    assert pred.shape == (16, 1)
+    assert torch.isfinite(pred).all()
+
+
+def test_hl_gauss_vs_mse_performance():
+    L.seed_everything(42, verbose=False)
+    n = 300
+    x = torch.linspace(-3, 3, n).unsqueeze(1)
+    y_smooth = torch.sin(x * 2.0)
+    # Bimodal: split randomly between y_smooth and y_smooth + 5.0
+    y_bimodal = torch.where(torch.rand(n, 1) > 0.5, y_smooth, y_smooth + 5.0)
+
+    def train_and_eval(y_target, head):
+        df = pd.DataFrame(
+            {"feat": x.squeeze().numpy(), "target": y_target.squeeze().numpy()}
+        )
+        cfg = SingleRowConfig.generate(df, target="target")
+        ds = TabularDS(df, cfg)
+        loader = DataLoader(ds, batch_size=64, collate_fn=tabular_collate_fn)
+
+        model = SingleRowRegressor(
+            cfg,
+            d_model=32,
+            n_heads=2,
+            n_layers=2,
+            head=head,
+            y_train=df["target"].values if head == "hl_gauss" else None,
+            hl_gauss_bins=30,
+            lr=0.02,
+        )
+        trainer, _ = build_trainer(max_epochs=30, patience=None)
+        trainer.fit(model, train_dataloaders=loader)
+
+        model.eval()
+        with torch.no_grad():
+            preds = []
+            for b in loader:
+                preds.append(model.predict_value(b))
+            pred = torch.cat(preds, dim=0)
+        rmse = torch.sqrt(torch.mean((pred - y_target) ** 2)).item()
+        return rmse
+
+    rmse_mse_smooth = train_and_eval(y_smooth, "mse")
+    rmse_hl_smooth = train_and_eval(y_smooth, "hl_gauss")
+    # hl_gauss should be within 10% of mse, or better
+    assert rmse_hl_smooth < rmse_mse_smooth * 1.10
+
+    rmse_mse_bimodal = train_and_eval(y_bimodal, "mse")
+    rmse_hl_bimodal = train_and_eval(y_bimodal, "hl_gauss")
+    # hl_gauss should beat mse on bimodal
+    assert rmse_hl_bimodal < rmse_mse_bimodal
+
+
+def test_mtm_numeric_only_uses_masked_cells_only():
+    df = _toy_df().drop(columns=["cat", "target"])
+    cfg = SingleRowConfig.generate(df)
+    ds = TabularDS(df, cfg)
+    loader = DataLoader(ds, batch_size=16, collate_fn=masked_tabular_collate_fn)
+    mtm = SingleRowMTM(cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS)
+    batch = next(iter(loader))
+    loss = mtm._step(batch, "train_loss")
+    assert torch.isfinite(loss)
+
+
+def test_mtm_aggregate_loss_only_on_masked():
+    # Test that MTM loss is only calculated on masked cells
+    from trea.models.single_row import NumericCategoricalData
+
+    df = _toy_df().drop(columns=["cat", "target"])
+    cfg = SingleRowConfig.generate(df)
+    mtm = SingleRowMTM(cfg, d_model=D_MODEL, n_heads=N_HEADS, n_layers=N_LAYERS)
+
+    # Create manual actual and predicted tensors
+    actual = NumericCategoricalData(numeric=torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
+    predicted = NumericCategoricalData(numeric=torch.tensor([[1.5, 2.5], [3.5, 4.5]]))
+
+    # Mask is: row 0 col 0 is masked, others not
+    num_mask = torch.tensor([[True, False], [False, False]])
+
+    # Loss should only be based on actual[0,0] vs predicted[0,0]
+    # which is (1.5 - 1.0)^2 = 0.25
+    loss = mtm.aggregate_loss(actual, predicted, num_mask, cat_mask=None)
+    assert torch.allclose(loss, torch.tensor(0.25))
+
+    # If we modify actual[0,1] (unmasked), the loss should NOT change!
+    actual.numeric = actual.numeric.clone()
+    actual.numeric[0, 1] = 999.0
+    loss2 = mtm.aggregate_loss(actual, predicted, num_mask, cat_mask=None)
+    assert torch.allclose(loss2, torch.tensor(0.25))
+
+    # If we modify predicted[0,1] (unmasked), the loss should NOT change!
+    predicted.numeric = predicted.numeric.clone()
+    predicted.numeric[0, 1] = 999.0
+    loss3 = mtm.aggregate_loss(actual, predicted, num_mask, cat_mask=None)
+    assert torch.allclose(loss3, torch.tensor(0.25))
+
+
+def test_oov_categorical_maps_to_unk():
+    train = _toy_df()
+    cfg = SingleRowConfig.generate(train, target="target")
+    test = train.head(2).copy()
+    test.loc[test.index[0], "cat"] = "never_seen"
+    ds = TabularDS(test, cfg)
+    unk = cfg.token_dict["[UNK]"]
+    assert int(ds[0].inputs.categorical[0]) == unk
+
+
+def test_dual_numeric_encoder():
+    df = _toy_df()
+    cfg = SingleRowConfig.generate(df, target="target")
+    model = TabularEncoder(
+        cfg,
+        d_model=32,
+        value_encoder="dual",
+        fusion="hadamard",
+    )
+    assert model.ple_bank.weight.shape == (64, 32)
+
+    # Check value=0 does not give a zero vector
+    num_inputs = torch.zeros(2, cfg.n_numeric_cols)
+    cat_inputs = None
+
+    # Missing cells (NaN)
+    num_missing = torch.full((2, cfg.n_numeric_cols), float("nan"))
+
+    out_zero = model(num_inputs, cat_inputs)
+    out_nan = model(num_missing, cat_inputs)
+
+    # Output vectors shouldn't be identical
+    assert not torch.allclose(out_zero, out_nan)
+
+    # Zero value doesn't equal zero vector in the base numeric embedding
+    # (Checking the internal projection if needed, but end output should suffice)
+    assert out_zero.abs().sum() > 1e-4
