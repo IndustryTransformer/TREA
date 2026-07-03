@@ -12,11 +12,12 @@ Run:  uv run python scripts/download_uea_archive.py
 import json
 import re
 import socket
+import urllib.request
 import warnings
 import zipfile
+
 from pathlib import Path
 
-import urllib.request
 
 warnings.filterwarnings("ignore")
 socket.setdefaulttimeout(300)
@@ -27,10 +28,25 @@ BASE = "https://www.timeseriesclassification.com/aeon-toolkit"
 # Equal-length multivariate UEA datasets spanning domains/sizes (the giant high-dim ones
 # -- MotorImagery, PEMS-SF, DuckDuckGeese, FaceDetection -- are left out for now).
 DATASETS = [
-    "ArticularyWordRecognition", "BasicMotions", "Epilepsy", "NATOPS", "RacketSports",
-    "Cricket", "ERing", "EthanolConcentration", "FingerMovements",
-    "HandMovementDirection", "Handwriting", "Heartbeat", "Libras", "LSST", "PenDigits",
-    "SelfRegulationSCP1", "SelfRegulationSCP2", "StandWalkJump", "UWaveGestureLibrary",
+    "ArticularyWordRecognition",
+    "BasicMotions",
+    "Epilepsy",
+    "NATOPS",
+    "RacketSports",
+    "Cricket",
+    "ERing",
+    "EthanolConcentration",
+    "FingerMovements",
+    "HandMovementDirection",
+    "Handwriting",
+    "Heartbeat",
+    "Libras",
+    "LSST",
+    "PenDigits",
+    "SelfRegulationSCP1",
+    "SelfRegulationSCP2",
+    "StandWalkJump",
+    "UWaveGestureLibrary",
     "AtrialFibrillation",
 ]
 
@@ -82,23 +98,33 @@ def main():
             stamps = tr.get("timestamps", "false").lower() == "true"
             compatible = equal and not missing and not stamps
             rec = {
-                "name": ds, "dimensions": int(tr.get("dimensions", 0) or 0),
+                "name": ds,
+                "dimensions": int(tr.get("dimensions", 0) or 0),
                 "series_length": int(tr.get("serieslength", 0) or 0),
-                "n_classes": n_classes, "n_train": tr["n_rows"], "n_test": te["n_rows"],
-                "equal_length": equal, "missing": missing,
+                "n_classes": n_classes,
+                "n_train": tr["n_rows"],
+                "n_test": te["n_rows"],
+                "equal_length": equal,
+                "missing": missing,
                 "parser_compatible": compatible,
             }
             manifest.append(rec)
             flag = "OK  " if compatible else "INCOMPAT"
-            print(f"  {flag} {ds:28s} dim={rec['dimensions']:>3} len={rec['series_length']:>4} "
-                  f"cls={n_classes:>2} train/test={tr['n_rows']}/{te['n_rows']}"
-                  f"{'' if compatible else '  (unequal/missing/timestamps)'}", flush=True)
+            print(
+                f"  {flag} {ds:28s} dim={rec['dimensions']:>3} len={rec['series_length']:>4} "
+                f"cls={n_classes:>2} train/test={tr['n_rows']}/{te['n_rows']}"
+                f"{'' if compatible else '  (unequal/missing/timestamps)'}",
+                flush=True,
+            )
         except Exception as e:
             print(f"  FAIL {ds:28s} {type(e).__name__}: {str(e)[:55]}", flush=True)
 
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
     ok = [m for m in manifest if m["parser_compatible"]]
-    print(f"\n=== {len(manifest)} UEA datasets fetched, {len(ok)} parser-compatible -> {OUT} ===", flush=True)
+    print(
+        f"\n=== {len(manifest)} UEA datasets fetched, {len(ok)} parser-compatible -> {OUT} ===",
+        flush=True,
+    )
     print(f"  usable now: {sorted(m['name'] for m in ok)}", flush=True)
 
 

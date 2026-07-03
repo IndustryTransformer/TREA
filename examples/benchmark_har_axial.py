@@ -498,9 +498,7 @@ def macro_f1(pred: torch.Tensor, target: torch.Tensor, num_classes: int) -> floa
         precision = tp / (tp + fp) if tp + fp else 0.0
         recall = tp / (tp + fn) if tp + fn else 0.0
         f1s.append(
-            2 * precision * recall / (precision + recall)
-            if precision + recall
-            else 0.0
+            2 * precision * recall / (precision + recall) if precision + recall else 0.0
         )
     return float(sum(f1s) / len(f1s))
 
@@ -868,8 +866,7 @@ def main() -> None:
         xgb = xgb_stats_baseline(train, test, num_classes, args)
         results["xgb_stats"] = asdict(xgb)
         print(
-            f"{'xgb_stats':<12} test_acc={xgb.accuracy:.3f} "
-            f"test_f1={xgb.macro_f1:.3f}",
+            f"{'xgb_stats':<12} test_acc={xgb.accuracy:.3f} test_f1={xgb.macro_f1:.3f}",
             flush=True,
         )
     for name, model_cls, model_kwargs in model_builders:
@@ -893,8 +890,7 @@ def main() -> None:
     print("\nFinal test:")
     for name, metrics in results.items():
         print(
-            f"  {name:<12} acc={metrics['accuracy']:.3f} "
-            f"f1={metrics['macro_f1']:.3f}"
+            f"  {name:<12} acc={metrics['accuracy']:.3f} f1={metrics['macro_f1']:.3f}"
         )
 
     if args.output:

@@ -24,15 +24,28 @@ from statistics import mean, pstdev
 # sweeps cover the small ones first. Per-(dataset, seed) checkpointing makes it
 # resumable; subset with --datasets for a quick pass.
 DEFAULT_DATASETS = [
-    "RacketSports", "ERing", "Libras", "BasicMotions", "PenDigits",
-    "NATOPS", "Epilepsy", "ArticularyWordRecognition", "Handwriting",
-    "UWaveGestureLibrary", "FingerMovements", "HandMovementDirection", "LSST",
-    "AtrialFibrillation", "Heartbeat", "Cricket", "SelfRegulationSCP1",
-    "SelfRegulationSCP2", "EthanolConcentration", "StandWalkJump",
+    "RacketSports",
+    "ERing",
+    "Libras",
+    "BasicMotions",
+    "PenDigits",
+    "NATOPS",
+    "Epilepsy",
+    "ArticularyWordRecognition",
+    "Handwriting",
+    "UWaveGestureLibrary",
+    "FingerMovements",
+    "HandMovementDirection",
+    "LSST",
+    "AtrialFibrillation",
+    "Heartbeat",
+    "Cricket",
+    "SelfRegulationSCP1",
+    "SelfRegulationSCP2",
+    "EthanolConcentration",
+    "StandWalkJump",
 ]
-DEFAULT_MODELS = (
-    "xgb_raw_flat,xgb_stats,axial,axial_stats,conv_axial,conv_axial_stats"
-)
+DEFAULT_MODELS = "xgb_raw_flat,xgb_stats,axial,axial_stats,conv_axial,conv_axial_stats"
 
 
 def run_one(args: argparse.Namespace, dataset: str, seed: int, output: Path) -> None:

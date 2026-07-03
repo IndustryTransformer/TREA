@@ -177,7 +177,11 @@ class ThreeWDataset(Dataset):
 
             well_of = np.array(
                 [
-                    (m.group(1) if (m := _re.search(r"WELL-\d+", str(p))) else f"sim-{i}")
+                    (
+                        m.group(1)
+                        if (m := _re.search(r"WELL-\d+", str(p)))
+                        else f"sim-{i}"
+                    )
                     for i, p in enumerate(parquet_ds.files_events)
                 ]
             )
@@ -198,7 +202,9 @@ class ThreeWDataset(Dataset):
             train_indices = file_indices[: n_total - n_val]
             val_indices = file_indices[n_total - n_val :]
         else:
-            raise ValueError(f"Unknown split_mode: {split_mode!r}. Use 'random' or 'well'.")
+            raise ValueError(
+                f"Unknown split_mode: {split_mode!r}. Use 'random' or 'well'."
+            )
 
         if split == "train":
             selected_indices = train_indices

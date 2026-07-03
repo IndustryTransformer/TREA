@@ -18,12 +18,13 @@ Run:  uv run python scripts/download_openml_suites.py
 import json
 import re
 import socket
+import urllib.request
 import warnings
+
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-import urllib.request
+
 
 warnings.filterwarnings("ignore")
 socket.setdefaulttimeout(180)  # bound each fetch so one hang can't stall the batch
@@ -32,7 +33,9 @@ OUT = Path(__file__).resolve().parent.parent / "data" / "tabular_corpus"
 SUITES = {"regression": "353", "classification": "99"}
 MAX_ROWS, MAX_FEAT, MIN_ROWS, MIN_FEAT = 20_000, 150, 300, 3
 MAX_CLASSES, MIN_CLASS_COUNT = 50, 10
-GENERIC = re.compile(r"^(v|x|f|col|att|attr|feature|var|pixel|p|dim)_?\d+$", re.IGNORECASE)
+GENERIC = re.compile(
+    r"^(v|x|f|col|att|attr|feature|var|pixel|p|dim)_?\d+$", re.IGNORECASE
+)
 
 
 def suite_data_ids(study_id: str) -> list[str]:
@@ -89,11 +92,16 @@ def process(did: str, task: str):
 
     feat = [c for c in df.columns if c != "__target__"]
     rec = {
-        "name": name, "source": f"openml:{did}", "task": task,
-        "target": "__target__", "n_rows": len(df), "n_features": len(feat),
+        "name": name,
+        "source": f"openml:{did}",
+        "task": task,
+        "target": "__target__",
+        "n_rows": len(df),
+        "n_features": len(feat),
         "n_cat_dropped": int(n_cat_dropped),
         "meaningful": round(meaningful_frac(feat), 3),
-        "feature_cols": feat, "descriptions": {c: clean(c) for c in feat},
+        "feature_cols": feat,
+        "descriptions": {c: clean(c) for c in feat},
     }
     if task == "classification":
         rec["n_classes"] = int(df["__target__"].nunique())
@@ -111,14 +119,22 @@ def main():
         try:
             ids = suite_data_ids(study)
         except Exception as e:
-            print(f"SUITE {task} ({study}) FAIL: {type(e).__name__} {str(e)[:60]}", flush=True)
+            print(
+                f"SUITE {task} ({study}) FAIL: {type(e).__name__} {str(e)[:60]}",
+                flush=True,
+            )
             continue
-        print(f"\n== {task}: {len(ids)} candidate datasets (OpenML study {study}) ==", flush=True)
+        print(
+            f"\n== {task}: {len(ids)} candidate datasets (OpenML study {study}) ==",
+            flush=True,
+        )
         for did in ids:
             try:
                 res = process(did, task)
             except Exception as e:
-                print(f"  FAIL  id={did:>7} {type(e).__name__}: {str(e)[:50]}", flush=True)
+                print(
+                    f"  FAIL  id={did:>7} {type(e).__name__}: {str(e)[:50]}", flush=True
+                )
                 continue
             if res is None:
                 print(f"  skip  id={did:>7} (filtered: task/size/features)", flush=True)
@@ -133,16 +149,24 @@ def main():
             added += 1
             mf = rec["meaningful"]
             tag = "MEANINGFUL" if mf >= 0.6 else "generic   "
-            print(f"  OK   id={did:>7} {name:36s} {rec['n_rows']:>6}x{rec['n_features']:<3} "
-                  f"{tag} ({mf:.2f})", flush=True)
+            print(
+                f"  OK   id={did:>7} {name:36s} {rec['n_rows']:>6}x{rec['n_features']:<3} "
+                f"{tag} ({mf:.2f})",
+                flush=True,
+            )
 
     mpath.write_text(json.dumps(manifest, indent=2))
     reg = [m for m in manifest if m.get("task", "regression") == "regression"]
     clf = [m for m in manifest if m.get("task") == "classification"]
     named = [m for m in manifest if m.get("meaningful", 1.0) >= 0.6]
-    print(f"\n=== corpus now {len(manifest)} datasets (+{added} this run) ===", flush=True)
-    print(f"  {len(reg)} regression | {len(clf)} classification | "
-          f"{len(named)} with meaningful column names", flush=True)
+    print(
+        f"\n=== corpus now {len(manifest)} datasets (+{added} this run) ===", flush=True
+    )
+    print(
+        f"  {len(reg)} regression | {len(clf)} classification | "
+        f"{len(named)} with meaningful column names",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

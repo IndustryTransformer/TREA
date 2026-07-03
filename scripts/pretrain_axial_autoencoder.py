@@ -246,8 +246,7 @@ class SyntheticTimeSeriesDataset(Dataset):
         )
         if self.missing_rate > 0:
             missing = (
-                torch.rand(self.num_features, self.T, generator=gen)
-                < self.missing_rate
+                torch.rand(self.num_features, self.T, generator=gen) < self.missing_rate
             )
             x = x.masked_fill(missing, float("nan"))
         return (x.float(),)

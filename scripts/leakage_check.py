@@ -21,16 +21,20 @@ import argparse
 import re
 import sys
 import warnings
+
 from pathlib import Path
 
 import numpy as np
 import polars as pl
+
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import f1_score, balanced_accuracy_score
+from sklearn.metrics import balanced_accuracy_score, f1_score
 from sklearn.model_selection import StratifiedGroupKFold
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.three_w import SENSOR_COLUMNS  # noqa: E402
+
 
 RAW = Path("/home/kailukowiak/Work/3W/dataset")
 WELL_RE = re.compile(r"(WELL-\d+)")
@@ -90,10 +94,13 @@ def load(max_per_class: int | None, window: int):
             keep = labs >= 0
             if keep.sum() == 0:
                 continue
-            X.append(feats[keep]); y.append(labs[keep])
-            file_id.append(np.full(keep.sum(), fid)); well_id.append([well] * int(keep.sum()))
+            X.append(feats[keep])
+            y.append(labs[keep])
+            file_id.append(np.full(keep.sum(), fid))
+            well_id.append([well] * int(keep.sum()))
             fid += 1
-    X = np.concatenate(X); y = np.concatenate(y)
+    X = np.concatenate(X)
+    y = np.concatenate(y)
     file_id = np.concatenate(file_id)
     well_id = np.array([w for sub in well_id for w in sub])
     return X, y, file_id, well_id
@@ -111,9 +118,11 @@ def run_cv(X, y, groups, n_splits, seed, label):
         f1s.append(f1_score(y[te], p, average="macro", zero_division=0))
         bals.append(balanced_accuracy_score(y[te], p))
         missing.append(sorted(set(range(10)) - set(np.unique(y[te]))))
-    print(f"  {label:14s} macro-F1 {np.mean(f1s):.4f} ± {np.std(f1s):.4f} | "
-          f"bal-acc {np.mean(bals):.4f} | n_groups {len(set(groups))} | "
-          f"classes-missing-from-test-folds {missing}")
+    print(
+        f"  {label:14s} macro-F1 {np.mean(f1s):.4f} ± {np.std(f1s):.4f} | "
+        f"bal-acc {np.mean(bals):.4f} | n_groups {len(set(groups))} | "
+        f"classes-missing-from-test-folds {missing}"
+    )
     return np.mean(f1s)
 
 
@@ -125,16 +134,22 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     a = ap.parse_args()
 
-    print(f"Loading 3W windows (window={a.window}, cap/class={a.max_files_per_class})...")
+    print(
+        f"Loading 3W windows (window={a.window}, cap/class={a.max_files_per_class})..."
+    )
     X, y, file_id, well_id = load(a.max_files_per_class, a.window)
-    print(f"  {len(y):,} windows | {len(set(file_id))} files | {len(set(well_id))} wells "
-          f"| class dist {np.bincount(y, minlength=10).tolist()}\n")
+    print(
+        f"  {len(y):,} windows | {len(set(file_id))} files | {len(set(well_id))} wells "
+        f"| class dist {np.bincount(y, minlength=10).tolist()}\n"
+    )
 
     print("RF on stat features, StratifiedGroupKFold:")
-    leaky = run_cv(X, y, file_id, a.n_splits, a.seed, "file-grouped")   # wells can span
-    clean = run_cv(X, y, well_id, a.n_splits, a.seed, "well-grouped")   # honest
-    print(f"\n==> well-leakage effect on RF: {leaky - clean:+.4f} macro-F1 "
-          f"(file-grouped {leaky:.4f} -> well-grouped {clean:.4f})")
+    leaky = run_cv(X, y, file_id, a.n_splits, a.seed, "file-grouped")  # wells can span
+    clean = run_cv(X, y, well_id, a.n_splits, a.seed, "well-grouped")  # honest
+    print(
+        f"\n==> well-leakage effect on RF: {leaky - clean:+.4f} macro-F1 "
+        f"(file-grouped {leaky:.4f} -> well-grouped {clean:.4f})"
+    )
 
 
 if __name__ == "__main__":

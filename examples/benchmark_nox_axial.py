@@ -319,6 +319,7 @@ def make_loaders(
 
     return loader(train, True), loader(val, False), loader(test, False)
 
+
 def xgb_stats_baseline(
     train: tuple[np.ndarray, np.ndarray, np.ndarray],
     test: tuple[np.ndarray, np.ndarray, np.ndarray],
@@ -526,8 +527,7 @@ def main() -> None:
     print("\nFinal test:")
     for name, metrics in results.items():
         print(
-            f"  {name:<12} rmse={metrics['rmse_nox']:.3f} "
-            f"mae={metrics['mae_nox']:.3f}"
+            f"  {name:<12} rmse={metrics['rmse_nox']:.3f} mae={metrics['mae_nox']:.3f}"
         )
 
     if args.output:

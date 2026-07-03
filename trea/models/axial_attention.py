@@ -477,9 +477,7 @@ class AxialEncoder(nn.Module):
             tokens = tokens + pad.view(1, 1, Fdim, self.d_model)
 
         steps = torch.arange(self.num_steps, device=device)
-        return tokens + self.time_pos(steps).view(
-            1, self.num_steps, 1, self.d_model
-        )
+        return tokens + self.time_pos(steps).view(1, self.num_steps, 1, self.d_model)
 
     def build_tokens(self, x_val: torch.Tensor, m_nan: torch.Tensor) -> torch.Tensor:
         """Build ``[B, num_steps, F, d]`` tokens from value/mask ``[B, F, T]``."""

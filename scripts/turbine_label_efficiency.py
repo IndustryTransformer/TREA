@@ -14,12 +14,15 @@ Run:
 
 import argparse
 import sys
+
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
 from sklearn.metrics import mean_squared_error
 from xgboost import XGBRegressor
+
 
 NOX_DIR = Path(__file__).resolve().parent.parent / "data" / "nox"
 TARGET = "NOX"
@@ -45,9 +48,13 @@ def load():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", choices=["temporal", "random"], default="temporal",
-                    help="temporal = honest (train early years, test late); "
-                         "random = leaky for time series (same-distribution shuffle).")
+    ap.add_argument(
+        "--split",
+        choices=["temporal", "random"],
+        default="temporal",
+        help="temporal = honest (train early years, test late); "
+        "random = leaky for time series (same-distribution shuffle).",
+    )
     a = ap.parse_args()
 
     df = load()
@@ -67,8 +74,10 @@ def main():
     Xte = ((te[FEATURES] - mu) / sd).to_numpy(np.float32)
     yte = te[TARGET].to_numpy(np.float32)
 
-    print(f"Turbine NOx | train {len(ytr_all):,} rows ({TRAIN_YEARS}) | "
-          f"test {len(yte):,} rows ({TEST_YEARS}) | {len(FEATURES)} features")
+    print(
+        f"Turbine NOx | train {len(ytr_all):,} rows ({TRAIN_YEARS}) | "
+        f"test {len(yte):,} rows ({TEST_YEARS}) | {len(FEATURES)} features"
+    )
     print(f"NOX test range [{yte.min():.1f}, {yte.max():.1f}], std {yte.std():.2f}\n")
     print(f"{'frac':>6} {'n_labels':>9} {'XGB test-RMSE (mean±std)':>26}")
 
@@ -80,8 +89,13 @@ def main():
             rng = np.random.RandomState(seed)
             idx = rng.choice(len(ytr_all), size=n_lab, replace=False)
             model = XGBRegressor(
-                n_estimators=400, max_depth=6, learning_rate=0.05,
-                subsample=0.8, colsample_bytree=0.8, n_jobs=-1, random_state=seed,
+                n_estimators=400,
+                max_depth=6,
+                learning_rate=0.05,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                n_jobs=-1,
+                random_state=seed,
             )
             model.fit(Xtr_all[idx], ytr_all[idx])
             rmse = float(np.sqrt(mean_squared_error(yte, model.predict(Xte))))
@@ -89,8 +103,10 @@ def main():
         results[frac] = (np.mean(rmses), np.std(rmses), n_lab)
         print(f"{frac:>6.2f} {n_lab:>9,} {np.mean(rmses):>14.3f} ± {np.std(rmses):.3f}")
 
-    print("\nThis is the bar. The pretrained->finetuned model must beat the low-frac rows "
-          "(≤10%) to satisfy the kill criterion (docs/LESSONS.md §3).")
+    print(
+        "\nThis is the bar. The pretrained->finetuned model must beat the low-frac rows "
+        "(≤10%) to satisfy the kill criterion (docs/LESSONS.md §3)."
+    )
 
 
 if __name__ == "__main__":

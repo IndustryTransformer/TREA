@@ -105,7 +105,8 @@ def encode_arrays(
             out["final_mean"].append(final.mean(dim=(1, 2)).cpu().numpy())
             if encoder.num_global_tokens > 0:
                 out.setdefault("final_latents", []).append(
-                    final[:, :, -encoder.num_global_tokens :, :].mean(dim=(1, 2))
+                    final[:, :, -encoder.num_global_tokens :, :]
+                    .mean(dim=(1, 2))
                     .cpu()
                     .numpy()
                 )

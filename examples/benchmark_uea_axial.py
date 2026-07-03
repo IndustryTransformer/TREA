@@ -100,9 +100,7 @@ def parse_uea_ts(path: Path) -> tuple[np.ndarray, list[str], list[str]]:
         series = []
         for dim_values in parts[:dimensions]:
             vals = [
-                float(v) if v != "?" else np.nan
-                for v in dim_values.split(",")
-                if v
+                float(v) if v != "?" else np.nan for v in dim_values.split(",") if v
             ]
             series.append(vals)
         xs.append(series)
@@ -188,8 +186,7 @@ def parse_args() -> argparse.Namespace:
         "--models",
         type=str,
         default=(
-            "xgb_raw_flat,xgb_stats,axial,axial_stats,conv_axial,"
-            "conv_axial_stats"
+            "xgb_raw_flat,xgb_stats,axial,axial_stats,conv_axial,conv_axial_stats"
         ),
     )
     return parser.parse_args()
@@ -385,8 +382,7 @@ def main() -> None:
         xgb = xgb_stats_baseline(train, test, num_classes, args)
         results["xgb_stats"] = asdict(xgb)
         print(
-            f"{'xgb_stats':<16} test_acc={xgb.accuracy:.3f} "
-            f"test_f1={xgb.macro_f1:.3f}",
+            f"{'xgb_stats':<16} test_acc={xgb.accuracy:.3f} test_f1={xgb.macro_f1:.3f}",
             flush=True,
         )
     for name, model_cls, kwargs in builders:
@@ -410,8 +406,7 @@ def main() -> None:
     print("\nFinal test:")
     for name, metrics in results.items():
         print(
-            f"  {name:<16} acc={metrics['accuracy']:.3f} "
-            f"f1={metrics['macro_f1']:.3f}"
+            f"  {name:<16} acc={metrics['accuracy']:.3f} f1={metrics['macro_f1']:.3f}"
         )
 
     if args.output:

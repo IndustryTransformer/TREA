@@ -41,16 +41,19 @@ import argparse
 import json
 import os
 import warnings
+
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 from xgboost import XGBRegressor
+
 
 warnings.filterwarnings("ignore")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -63,6 +66,7 @@ from trea.models.column_embeddings import (  # noqa: E402
 )
 from trea.models.single_row import AttentionPooling, TabularEncoder  # noqa: E402
 from trea.utils.single_row_data import SingleRowConfig  # noqa: E402
+
 
 CORPUS = Path(__file__).resolve().parent.parent / "data" / "tabular_corpus"
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
@@ -308,7 +312,7 @@ def main():
         )
 
         for K in a.k_values:
-            if K > len(pool):
+            if len(pool) < K:
                 continue
             for etype in ("semantic", "index"):
                 rmses = []
