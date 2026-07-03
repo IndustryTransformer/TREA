@@ -46,9 +46,11 @@ from xgboost import XGBClassifier, XGBRegressor
 warnings.filterwarnings("ignore")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 torch.set_float32_matmul_precision("medium")
-# Silence Lightning's per-fit device/dataloader chatter (one block per Trainer.fit).
-for _n in ("pytorch_lightning", "lightning.pytorch", "lightning"):
-    logging.getLogger(_n).setLevel(logging.ERROR)
+# Silence Lightning's per-fit device/dataloader chatter (the "GPU available: ..."
+# blocks etc.) -- these go through rank_zero_info under a logger whose name varies
+# with import order, so gate everything at INFO globally. The harness prints its
+# own results with print(), not logging, so nothing we care about is lost.
+logging.disable(logging.INFO)
 
 from trea.training.single_row import (  # noqa: E402
     SingleRowClassifier,
