@@ -8,7 +8,8 @@ published results from Fernandes et al. (2024):
 
 Usage:
     uv run python examples/benchmark_3w_binary.py
-    uv run python examples/benchmark_3w_binary.py --models trea_triple_stat_tokens,lof,rf --seeds 42,43,44
+    uv run python examples/benchmark_3w_binary.py \
+        --models trea_triple_stat_tokens,lof,rf --seeds 42,43,44
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ import torch.nn as nn
 
 from pytorch_lightning.callbacks import EarlyStopping
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_auc_score
 from sklearn.neighbors import LocalOutlierFactor
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
@@ -64,7 +66,8 @@ def remap_to_binary(dataset: ThreeWDataset) -> None:
         dataset.class_weights[cls] = total / (count * 2)
 
     print(
-        f"  Binary remap: Normal={dataset.class_counts[0]}, Anomaly={dataset.class_counts[1]}"
+        f"  Binary remap: Normal={dataset.class_counts[0]}, "
+        f"Anomaly={dataset.class_counts[1]}"
     )
 
 
@@ -141,6 +144,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--window-size", type=int, default=96)
     parser.add_argument("--stride", type=int, default=96)
+    parser.add_argument(
+        "--split-mode",
+        choices=["random", "well"],
+        default="well",
+        help="'well' = well-disjoint split (the pre-registered LESSONS.md section 3 "
+        "gate: no well spans train/val); 'random' = legacy leaky file split.",
+    )
     parser.add_argument("--val-fraction", type=float, default=0.2)
     parser.add_argument("--data-split-seed", type=int, default=42)
     parser.add_argument("--max-files", type=int, default=None)
@@ -229,8 +239,14 @@ def extract_engineered_features(windows: np.ndarray) -> np.ndarray:
     return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
 
-def binary_metrics(preds: np.ndarray, targets: np.ndarray) -> dict[str, float]:
-    """Compute binary classification metrics (anomaly = positive class)."""
+def binary_metrics(
+    preds: np.ndarray, targets: np.ndarray, scores: np.ndarray | None = None
+) -> dict[str, float]:
+    """Compute binary classification metrics (anomaly = positive class).
+
+    ``scores`` = continuous anomaly scores (higher = more anomalous) for AUC —
+    the pre-registered LESSONS.md section 3 gate metric on well-disjoint splits.
+    """
     tp = int(((preds == 1) & (targets == 1)).sum())
     fp = int(((preds == 1) & (targets == 0)).sum())
     fn = int(((preds == 0) & (targets == 1)).sum())
@@ -255,7 +271,12 @@ def binary_metrics(preds: np.ndarray, targets: np.ndarray) -> dict[str, float]:
     )
     macro_f1 = (f1_normal + f1) / 2.0
 
+    auc = float("nan")
+    if scores is not None and len(np.unique(targets)) == 2:
+        auc = float(roc_auc_score(targets, scores))
+
     return {
+        "auc": auc,
         "accuracy": accuracy,
         "anomaly_precision": precision,
         "anomaly_recall": recall,
@@ -279,6 +300,7 @@ def evaluate_torch_binary(
 
     all_preds = []
     all_targets = []
+    all_scores = []
 
     for batch in dataloader:
         x_num = batch["x_num"].to(device)
@@ -287,13 +309,16 @@ def evaluate_torch_binary(
 
         logits = model(x_num, x_cat)
         preds = torch.argmax(logits, dim=1).cpu().numpy()
+        scores = torch.softmax(logits.float(), dim=1)[:, 1].cpu().numpy()
 
         all_preds.append(preds)
         all_targets.append(y.numpy())
+        all_scores.append(scores)
 
     preds = np.concatenate(all_preds)
     targets = np.concatenate(all_targets)
-    return binary_metrics(preds, targets)
+    scores = np.concatenate(all_scores)
+    return binary_metrics(preds, targets, scores)
 
 
 def build_trea(
@@ -412,7 +437,8 @@ def run_rf_baseline(
     train_seconds = time.perf_counter() - t0
 
     pred = clf.predict(x_val)
-    metrics = binary_metrics(pred, y_val)
+    score = clf.predict_proba(x_val)[:, 1]
+    metrics = binary_metrics(pred, y_val, score)
     metrics["train_seconds"] = train_seconds
     metrics["num_params"] = 0
     return metrics
@@ -461,8 +487,9 @@ def run_lof_baseline(
     # LOF predict: 1 = inlier (normal), -1 = outlier (anomaly)
     raw_pred = lof.predict(x_val)
     pred = np.where(raw_pred == -1, 1, 0)  # remap: -1→Anomaly(1), 1→Normal(0)
+    score = -lof.decision_function(x_val)  # higher = more anomalous
 
-    metrics = binary_metrics(pred, y_val)
+    metrics = binary_metrics(pred, y_val, score)
     metrics["train_seconds"] = train_seconds
     metrics["num_params"] = 0
     return metrics
@@ -528,7 +555,8 @@ def build_report(
     lines.append("## Per-Run Detail")
     lines.append("")
     lines.append(
-        "| Model | Seed | Anomaly F1 | Normal F1 | Macro F1 | Accuracy | TP | FP | FN | TN |"
+        "| Model | Seed | Anomaly F1 | Normal F1 | Macro F1 | Accuracy | "
+        "TP | FP | FN | TN |"
     )
     lines.append(
         "|-------|-----:|----------:|---------:|--------:|--------:|---:|---:|---:|---:|"
@@ -553,8 +581,8 @@ def build_report(
         "(trained on both normal and anomaly windows)."
     )
     lines.append(
-        "- Fernandes et al. evaluate on real-only and simulated-only subsets separately. "
-        "Our evaluation uses the full mixed dataset (real + simulated), "
+        "- Fernandes et al. evaluate on real-only and simulated-only subsets "
+        "separately. Our evaluation uses the full mixed dataset (real + simulated), "
         "which may differ in difficulty."
     )
     lines.append(
@@ -591,6 +619,7 @@ def main() -> None:
         window_size=args.window_size,
         stride=args.stride,
         split="train",
+        split_mode=args.split_mode,
         val_fraction=args.val_fraction,
         max_files=args.max_files,
         seed=args.data_split_seed,
@@ -604,6 +633,7 @@ def main() -> None:
         window_size=args.window_size,
         stride=args.stride,
         split="val",
+        split_mode=args.split_mode,
         val_fraction=args.val_fraction,
         normalization_stats=train_ds.normalization_stats,
         max_files=args.max_files,
@@ -704,6 +734,7 @@ def main() -> None:
     fieldnames = [
         "model",
         "seed",
+        "auc",
         "anomaly_f1",
         "normal_f1",
         "macro_f1",
@@ -726,20 +757,43 @@ def main() -> None:
     print("\n" + "=" * 70)
     print("RESULTS SUMMARY")
     print("=" * 70)
-    print(f"\n{'Model':<30} {'Anomaly F1':>10} {'Macro F1':>10} {'Accuracy':>10}")
-    print("-" * 65)
+    print(
+        f"\n{'Model':<30} {'AUC':>10} {'Anomaly F1':>10} {'Macro F1':>10} "
+        f"{'Accuracy':>10}"
+    )
+    print("-" * 76)
 
+    means: dict[str, dict[str, float]] = {}
     for model_name in models:
         model_runs = [r for r in runs if r["model"] == model_name]
         if not model_runs:
             continue
+        auc = np.nanmean([r["auc"] for r in model_runs])
         af1 = np.mean([r["anomaly_f1"] for r in model_runs])
         mf1 = np.mean([r["macro_f1"] for r in model_runs])
         acc = np.mean([r["accuracy"] for r in model_runs])
-        print(f"{model_name:<30} {af1:>10.4f} {mf1:>10.4f} {acc:>10.4f}")
+        means[model_name] = {"auc": float(auc)}
+        print(f"{model_name:<30} {auc:>10.4f} {af1:>10.4f} {mf1:>10.4f} {acc:>10.4f}")
 
-    print(f"\n{'Published LOF (real)':<30} {'0.8700':>10} {'—':>10} {'—':>10}")
-    print(f"{'Published LOF (simulated)':<30} {'0.9200':>10} {'—':>10} {'—':>10}")
+    print(
+        f"\n{'Published LOF (real)':<30} {'—':>10} {'0.8700':>10} {'—':>10} {'—':>10}"
+    )
+    print(
+        f"{'Published LOF (simulated)':<30} {'—':>10} {'0.9200':>10} {'—':>10} "
+        f"{'—':>10}"
+    )
+
+    # Pre-registered LESSONS.md section 3 gate: deep beats RF on AUC over unseen
+    # wells (well-disjoint split). Only adjudicable when run with --split-mode well.
+    deep_names = [m for m in models if m in DEEP_MODELS and m in means]
+    if args.split_mode == "well" and deep_names and "rf" in means:
+        best_deep = max(deep_names, key=lambda m: means[m]["auc"])
+        d_auc, rf_auc = means[best_deep]["auc"], means["rf"]["auc"]
+        verdict = "PASS" if d_auc > rf_auc else "FAIL"
+        print(
+            f"\n=== SECTION-3 GATE (well-disjoint AUC): deep {best_deep} "
+            f"{d_auc:.4f} vs RF {rf_auc:.4f} -> {verdict} ==="
+        )
 
     print(f"\nResults saved to: {out_dir}")
     print(f"  - {out_dir / 'runs.csv'}")

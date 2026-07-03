@@ -112,6 +112,60 @@ win, transfer_semantic 2.37 < XGB 2.47). So this validates the *mechanism* (READ
 2: cross-dataset transfer), not "deep beats trees." Next: does the semantic edge scale
 with corpus size/diversity beyond K≈4, and does it hold with MTM (unlabeled) pretraining?
 
+### 3c. Turbine gate — ADJUDICATED: FAIL as written (2026-07-02)
+
+Full curve (`scripts/turbine_label_efficiency_deep.py`, temporal split train 2011–13 /
+test 2014–15, 3 seeds, RMSE in original NOx units, target std **11.04**):
+
+| frac | n_lab  | xgb          | cat          | scratch      | pre          |
+| ---- | ------ | ------------ | ------------ | ------------ | ------------ |
+| 0.01 | 222    | 12.310±0.273 | 12.059±0.246 | 12.148±0.513 | 13.144±0.625 |
+| 0.02 | 444    | 12.615±0.464 | 12.459±0.498 | 12.212±1.021 | 13.172±0.171 |
+| 0.05 | 1,110  | 12.877±0.224 | 12.718±0.262 | 13.049±0.289 | 12.802±0.160 |
+| 0.10 | 2,219  | 12.314±0.141 | 12.422±0.197 | 13.004±0.462 | 12.182±0.392 |
+| 0.25 | 5,548  | 12.264±0.090 | 12.442±0.141 | 13.721±0.461 | 13.162±0.665 |
+| 0.50 | 11,096 | 12.645±0.269 | 12.530±0.128 | 13.874±0.040 | 14.076±0.441 |
+| 1.00 | 22,191 | 12.631±0.026 | 12.392±0.064 | 14.206±0.606 | 14.174±0.512 |
+
+**Verdict as pre-registered: FAIL.** Pretrained beats best-tree only at frac 0.10
+(+0.132); loses at 0.01–0.05 and everywhere above 0.10. Recorded as a miss — the §3
+turbine gate is spent. The **§3 KILL clause is NOT triggered** (it requires failing
+*both* gates; the 3W binary well-disjoint gate is unadjudicated).
+
+**What the run actually established (read before citing the FAIL):**
+
+1. **The whole curve — trees included — sits above the target std (11.04):** on this
+   temporal split *nobody beats a constant mean-predictor*. The task is drift-limited,
+   not label-limited; the run measures drift robustness, not label efficiency.
+2. **Deep's full-data i.i.d. win was an i.i.d. artifact.** Same stack: deep 4.31 < xgb
+   4.47 on a random split vs deep 14.2 > xgb 12.6 temporal. Deep degrades monotonically
+   with more labels (in-distribution val selection under shift); trees are flat and far
+   more drift-robust. Report i.i.d. and shifted results side-by-side from now on.
+3. **Protocol defects identified before the final verdict** (mechanism-based, logged
+   mid-run): (a) no frozen-probe/low-LR arm at tiny N — full finetune @ lr 8e-4 on ~180
+   rows explains pre<scratch at 1–2%; (b) model selection on an i.i.d. val slice of the
+   *source* years explains deep worsening with labels; (c) no arm pretraining on
+   unlabeled *target-period* features (legitimate: no labels used; the actual industrial
+   deployment story and the one lever trees lack).
+
+**Pre-registered protocol v2 (locked 2026-07-02, BEFORE running — final for turbine, no
+further protocol revisions after seeing v2 results):**
+
+- Same temporal split, same fractions, **5 seeds** at fracs ≤ 0.10 (3 above).
+- Model selection for all deep arms on a **temporal val slice (last 10% of train time,
+  i.e. late 2013)**, not an i.i.d. subsample.
+- Deep arms: `scratch`, `pre` (SSL on train-period only), **`pre_target` (SSL on
+  train-period + unlabeled test-period features — transductive, labeled as such)**.
+- At fracs ≤ 0.05 each pretrained arm also reports a **frozen-encoder probe** (encoder
+  frozen, head-only fit, lr 1e-3) and the finetune uses lr 8e-5 (10× lower); the better
+  of probe/finetune per arm is that arm's score (chosen on the temporal val slice, never
+  on test).
+- **v2 success bar (same spirit as v1):** `pre_target` beats best-tree (xgb/cat) at
+  ≥3 of the 4 fracs ≤ 0.10 AND never loses to `scratch` there. Anything less = turbine
+  stays a tree benchmark; the deep line's continuation then rests entirely on the 3W
+  binary gate. *(Typo corrected pre-run, before any v2 result existed: the sweep has
+  4 fractions ≤ 0.10, not 3; the bar is ≥3/4 to preserve the intended ~2/3 stringency.)*
+
 ## 4. Architecture decisions (from the attention analysis)
 
 - **Bottleneck:** the row encoder mean-pools features to one vector per timestep, so the
