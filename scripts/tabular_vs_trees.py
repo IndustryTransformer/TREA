@@ -25,6 +25,8 @@ import json
 import logging
 import multiprocessing as mp
 import os
+import shutil
+import tempfile
 import warnings
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -191,7 +193,11 @@ def deep_score(
             warmup_frac=warmup_frac,
             ensemble_k=ensemble_k,
         )
-    ckdir = Path(os.environ.get("TMPDIR", "/tmp")) / f"tvt_{seed}"
+    # Unique per-call checkpoint dir: parallel workers must NOT share a path
+    # (a dir keyed by seed alone let two datasets clobber each other's best.ckpt,
+    # so load_best restored a foreign architecture -> state_dict mismatch).
+    _tmp = os.environ.get("TMPDIR", "/tmp")
+    ckdir = tempfile.mkdtemp(prefix=f"tvt_{seed}_", dir=_tmp)
     trainer, ckpt = build_trainer(
         max_epochs=epochs,
         patience=patience,
@@ -205,6 +211,7 @@ def deep_score(
         val_dataloaders=loader(val_i, False),
     )
     load_best(model, ckpt)
+    shutil.rmtree(ckdir, ignore_errors=True)
 
     model.eval()
     te_loader = DataLoader(
