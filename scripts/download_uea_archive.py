@@ -111,7 +111,8 @@ def main():
             manifest.append(rec)
             flag = "OK  " if compatible else "INCOMPAT"
             print(
-                f"  {flag} {ds:28s} dim={rec['dimensions']:>3} len={rec['series_length']:>4} "
+                f"  {flag} {ds:28s} dim={rec['dimensions']:>3} "
+                f"len={rec['series_length']:>4} "
                 f"cls={n_classes:>2} train/test={tr['n_rows']}/{te['n_rows']}"
                 f"{'' if compatible else '  (unequal/missing/timestamps)'}",
                 flush=True,
@@ -122,7 +123,8 @@ def main():
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
     ok = [m for m in manifest if m["parser_compatible"]]
     print(
-        f"\n=== {len(manifest)} UEA datasets fetched, {len(ok)} parser-compatible -> {OUT} ===",
+        f"\n=== {len(manifest)} UEA datasets fetched, "
+        f"{len(ok)} parser-compatible -> {OUT} ===",
         flush=True,
     )
     print(f"  usable now: {sorted(m['name'] for m in ok)}", flush=True)

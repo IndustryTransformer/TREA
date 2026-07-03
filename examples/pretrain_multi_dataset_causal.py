@@ -146,7 +146,9 @@ class ToyVariableDataset(Dataset):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Causal multi-dataset pretraining with synthetic + optional 3W data."
+        description=(
+            "Causal multi-dataset pretraining with synthetic + optional 3W data."
+        )
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--sequence-length", type=int, default=96)

@@ -132,7 +132,8 @@ class ConfusionMatrixCallback(Callback):
                 name = EVENT_NAMES.get(i, f"Class {i}")
                 support = cm[i, :].sum()
                 print(
-                    f"    {i:>2}  {prec:.3f}  {rec:.3f}  {f1:.3f}  {support:>7d}  {name}"
+                    f"    {i:>2}  {prec:.3f}  {rec:.3f}  {f1:.3f}  "
+                    f"{support:>7d}  {name}"
                 )
             print(f"    Macro F1: {np.mean(per_class_f1):.3f}")
 

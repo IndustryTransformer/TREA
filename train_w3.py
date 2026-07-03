@@ -126,10 +126,8 @@ class W3Dataset(Dataset):
         # Create label mapping: classes 0-9 stay the same, 101-109 map to 10-18
         # This ensures labels are contiguous from 0 to num_classes-1
         self.label_mapping = {}
-        remapped_idx = 0
-        for cls in sorted(unique_classes):
+        for remapped_idx, cls in enumerate(sorted(unique_classes)):
             self.label_mapping[cls] = remapped_idx
-            remapped_idx += 1
 
         # Apply label mapping
         self.labels = np.array(
@@ -262,7 +260,8 @@ class W3DataModule(pl.LightningDataModule):
                 )
                 df = df[df["well_name"].isin(selected_wells)]
                 print(
-                    f"Sampled {len(selected_wells)} wells, resulting in {len(df):,} samples"
+                    f"Sampled {len(selected_wells)} wells, "
+                    f"resulting in {len(df):,} samples"
                 )
 
             # Get unique wells and split at well level

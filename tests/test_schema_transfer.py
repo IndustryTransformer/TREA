@@ -2,9 +2,9 @@
 
 These verify the properties that make schema transfer possible *without* heavy training:
 
-  1. Frozen text embeddings of paraphrased column descriptions recover the cross-schema
-     correspondence -- a sensor's nearest neighbour under the *other* schema's wording is
-     its own match. This is the precondition for semantic transfer.
+  1. Frozen text embeddings of paraphrased column descriptions recover the
+     cross-schema correspondence -- a sensor's nearest neighbour under the *other*
+     schema's wording is its own match. This is the precondition for semantic transfer.
   2. An index embedder collapses every unseen column name to one shared [UNK] vector
      (the negative control: no cross-schema information), while the semantic encoder
      consumes a schema it was never given a vocabulary for.
@@ -79,7 +79,8 @@ def test_semantic_nn_recovers_correspondence(semantic):
     sims = a @ b.T  # rows L2-normalized -> cosine
     nn = sims.argmax(dim=1)
     matched = (nn == torch.arange(len(A_CODES))).sum().item()
-    # each A sensor's nearest B description should be its own paraphrase (allow one slip)
+    # each A sensor's nearest B description should be its own paraphrase (allow one
+    # slip)
     assert matched >= len(A_CODES) - 1
 
 
@@ -110,7 +111,8 @@ def test_index_embedder_unknown_name_collapses_to_unk():
 
 def test_semantic_encoder_consumes_unseen_schema(semantic):
     # Build a regressor on schema B's renamed codes whose descriptions the embedder
-    # was never constructed with -> still finite (identity is name-derived, not indexed).
+    # was never constructed with -> still finite (identity is name-derived, not
+    # indexed).
     codes = [f"tag_{i}" for i in range(len(A_CODES))]
     descr = {codes[i]: B_DESCR_BY_A[c] for i, c in enumerate(A_CODES)}
     cfg, df = _cfg_and_df(codes)

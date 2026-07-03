@@ -2,33 +2,39 @@
 pretraining schemas? This is the honest test the single A->B pair could not reach.
 
 Thesis (Kai): semantic column embeddings are a *meta-learning* bet -- the projection
-"column-description -> predictive role" only becomes reusable if fit across MANY column
-vocabularies. One source schema has nothing to generalize; the payoff (if any) shows up
-as a SLOPE: transfer to a held-out dataset should improve as K (# pretraining datasets)
-grows, and semantic should pull ahead of an index embedder that cannot cross vocabularies.
+"column-description -> predictive role" only becomes reusable if fit across MANY
+column vocabularies. One source schema has nothing to generalize; the payoff (if any)
+shows up as a SLOPE: transfer to a held-out dataset should improve as K (# pretraining
+datasets) grows, and semantic should pull ahead of an index embedder that cannot cross
+vocabularies.
 
 Setup (corpus from scripts/download_tabular_corpus.py):
   - One SHARED encoder (semantic embedder proj + numeric value projection + attention +
     pooling) with a per-dataset regression head. For all-numeric datasets every shared
-    weight is schema-independent, so the same encoder consumes any schema by swapping the
-    column descriptions -- variable-width transfer for free.
+    weight is schema-independent, so the same encoder consumes any schema by swapping
+    the column descriptions -- variable-width transfer for free.
   - Pretrain the shared encoder on K source datasets (round-robin, each standardized on
     its own train). Then few-shot fine-tune on a held-out dataset (unseen columns) and
     measure test RMSE (held-out's own units).
 
 Arms (held-out test RMSE):
-  transfer_semantic : shared encoder pretrained on K sources (semantic embedder) -> held-out
+  transfer_semantic : shared encoder pretrained on K sources (semantic embedder) ->
+                      held-out
   transfer_index    : same, but an index embedder whose vocab = source column names only
                       (held-out's columns are unseen -> [UNK]: the honest floor)
-  scratch_semantic  : semantic model trained on the held-out few-shot labels only (K-independent)
-  xgb               : XGBoost on the held-out few-shot labels (the tree bar; no transfer)
+  scratch_semantic  : semantic model trained on the held-out few-shot labels only
+                      (K-independent)
+  xgb               : XGBoost on the held-out few-shot labels (the tree bar; no
+                      transfer)
 
 == PRE-REGISTERED signal (locked before results) ==
 Semantic column transfer is VALIDATED iff, on average over held-out datasets:
-  (1) transfer_semantic test-RMSE DECREASES as K grows (a real schema-scaling slope), AND
+  (1) transfer_semantic test-RMSE DECREASES as K grows (a real schema-scaling slope),
+      AND
   (2) at the largest K, transfer_semantic < transfer_index (the gain is name-semantics,
       not just the shared numeric/attention backbone), AND
-  (3) at the largest K, transfer_semantic < scratch_semantic (pretraining helped at all).
+  (3) at the largest K, transfer_semantic < scratch_semantic (pretraining helped at
+      all).
 KILL if the slope is flat OR transfer_index >= transfer_semantic at large K -> tabular
 column-name semantics carry no transferable signal even across many schemas.
 
@@ -192,7 +198,10 @@ def eval_rmse(model, name, X, y, descr, tscale):
 
 
 def finetune_heldout(model, held, splits, descrs, n_labels, epochs, lr, tscale, seed):
-    """Fine-tune the (possibly pretrained) model on n_labels of held-out; best-val test."""
+    """Fine-tune the (possibly pretrained) model on n_labels of held-out.
+
+    Reports best-val test RMSE.
+    """
     name = held["name"]
     (Xtr, ytr), (Xte, yte), _ = splits[name]
     rng = np.random.RandomState(seed)
@@ -307,7 +316,8 @@ def main():
             base["xgb"].append(xgb_rmse(h, splits, a.n_labels, tscale, seed))
         b_sem, b_xgb = np.mean(base["scratch_semantic"]), np.mean(base["xgb"])
         print(
-            f"\n[{held}] tscale={tscale:.3f} | scratch_semantic={b_sem:.3f} | xgb={b_xgb:.3f}",
+            f"\n[{held}] tscale={tscale:.3f} | "
+            f"scratch_semantic={b_sem:.3f} | xgb={b_xgb:.3f}",
             flush=True,
         )
 
@@ -353,7 +363,8 @@ def main():
                     }
                 )
                 print(
-                    f"  K={K:>2} transfer_{etype:<8} RMSE {r:.3f} +- {np.std(rmses):.3f}",
+                    f"  K={K:>2} transfer_{etype:<8} "
+                    f"RMSE {r:.3f} +- {np.std(rmses):.3f}",
                     flush=True,
                 )
             results.append(
@@ -376,12 +387,13 @@ def main():
         rows = [r for r in results if r["held_out"] == held]
         ks = sorted({r["K"] for r in rows})
 
-        def g(K, arm):
+        def g(K, arm, rows=rows):
             v = [r["rmse"] for r in rows if r["K"] == K and r["arm"] == arm]
             return v[0] if v else float("nan")
 
         print(
-            f"\n[{held}]  scratch_semantic={g(ks[0], 'scratch_semantic'):.3f}  xgb={g(ks[0], 'xgb'):.3f}",
+            f"\n[{held}]  scratch_semantic={g(ks[0], 'scratch_semantic'):.3f}  "
+            f"xgb={g(ks[0], 'xgb'):.3f}",
             flush=True,
         )
         print(
@@ -389,7 +401,8 @@ def main():
         )
         for K in ks:
             print(
-                f"  {K:>3} {g(K, 'transfer_semantic'):>18.3f} {g(K, 'transfer_index'):>16.3f}",
+                f"  {K:>3} {g(K, 'transfer_semantic'):>18.3f} "
+                f"{g(K, 'transfer_index'):>16.3f}",
                 flush=True,
             )
         kmax = ks[-1]

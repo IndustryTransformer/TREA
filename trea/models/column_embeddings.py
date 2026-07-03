@@ -10,15 +10,16 @@ produced decides whether a model can transfer across schemas:
                             *no* usable identity for schema B's renamed columns. This
                             is the negative control -- it is exactly what trees also
                             cannot do.
-  SemanticColumnEmbedder -- a frozen text-LM embedding of the column's name/description,
-                            projected to d_model by a small learned head. The frozen
-                            text vectors live in one shared space across schemas, so a
-                            projection learned while pretraining on schema A also places
-                            schema B's column *descriptions* into the same d_model space.
-                            Semantically-matched columns ("ambient temperature" in A,
-                            "intake air temp" in B) land near each other -> the encoder's
-                            learned identity->value relationship transfers. This is the
-                            one thing tree models structurally cannot do.
+  SemanticColumnEmbedder -- a frozen text-LM embedding of the column's
+                            name/description, projected to d_model by a small learned
+                            head. The frozen text vectors live in one shared space
+                            across schemas, so a projection learned while pretraining
+                            on schema A also places schema B's column *descriptions*
+                            into the same d_model space. Semantically-matched columns
+                            ("ambient temperature" in A, "intake air temp" in B) land
+                            near each other -> the encoder's learned identity->value
+                            relationship transfers. This is the one thing tree models
+                            structurally cannot do.
 
 Both expose ``forward(names: list[str]) -> [n_cols, d_model]`` so ``TabularEncoder``
 uses an identical code path for either; only the embedder differs between experiment
@@ -70,10 +71,10 @@ class IndexColumnEmbedder(nn.Module):
 class SemanticColumnEmbedder(nn.Module):
     """Frozen text-LM embedding of column names/descriptions, projected to d_model.
 
-    The frozen text features are cached per name string in a plain dict (``_feat_cache``,
-    not a buffer/parameter) and moved to the projection's device on use, so they stay
-    out of state_dict and the optimizer. Only ``proj`` + ``norm`` carry gradients and
-    are what ``copy_encoder_weights`` moves between schemas.
+    The frozen text features are cached per name string in a plain dict
+    (``_feat_cache``, not a buffer/parameter) and moved to the projection's device on
+    use, so they stay out of state_dict and the optimizer. Only ``proj`` + ``norm``
+    carry gradients and are what ``copy_encoder_weights`` moves between schemas.
     """
 
     # Class-level cache so the two embedders in a transfer run (schema A and B) share

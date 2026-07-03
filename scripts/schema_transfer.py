@@ -15,7 +15,8 @@ shift between the two plants' physics):
   - Both plants z-score every sensor on their own train, so a given physical sensor is
     ~N(0,1) in both -> value scale is comparable; only the schema differs.
 
-Arms (test RMSE on Plant B's held-out rows, NOx units, mean over seeds vs B-label budget):
+Arms (test RMSE on Plant B's held-out rows, NOx units, mean over seeds vs B-label
+budget):
   scratch_index     : index-embedder regressor, trained on B's labels only
   scratch_semantic  : semantic-embedder regressor, trained on B's labels only
   transfer_index    : pretrain index regressor on A (full), copy the attention stack
@@ -33,14 +34,15 @@ not to the shared backbone.
 Averaged over seeds, at Plant-B label fractions <= 10%, semantic column transfer is
 VALIDATED iff ALL hold:
   (a) transfer_semantic < scratch_semantic           (pretraining on A actually helps B)
-  (b) transfer_semantic < transfer_index             (the help is name-based, not just the
-                                                       transferred attention stack)
-  (c) transfer_semantic < xgb at the smallest fraction (beats the tree where trees cannot
-                                                       touch Plant A at all)
+  (b) transfer_semantic < transfer_index             (the help is name-based, not just
+                                                       the transferred attention stack)
+  (c) transfer_semantic < xgb at the smallest fraction (beats the tree where trees
+                                                       cannot touch Plant A at all)
 KILL the semantic-column bet if (a) or (b) fails at every low-label fraction -> column
-names carry no transferable signal on this pair and the idea does not earn its complexity.
+names carry no transferable signal on this pair and the idea does not earn its
+complexity.
 
-Run (training script -- progress bars are off; ask before running, it trains ~70 models):
+Run (training script -- progress bars off; ask before running, it trains ~70 models):
     uv run python scripts/schema_transfer.py
     uv run python scripts/schema_transfer.py --smoke          # fast plumbing check
     uv run python scripts/schema_transfer.py --seeds 5 --fractions 0.01 0.05 0.1 1.0
@@ -86,7 +88,8 @@ D_MODEL, N_HEADS, N_LAYERS, LR, BATCH = 128, 4, 4, 8e-4, 512
 DATA = str(Path(__file__).resolve().parent.parent / "data" / "nox" / "*.csv")
 CKDIR = os.path.join(tempfile.gettempdir(), "trea_schema_transfer_ckpts")
 
-# Canonical descriptions for Plant A's sensors (UCI Gas Turbine CO/NOx feature glossary).
+# Canonical descriptions for Plant A's sensors (UCI Gas Turbine CO/NOx feature
+# glossary).
 A_DESCR = {
     "AT": "ambient air temperature in degrees celsius",
     "AP": "ambient barometric pressure in millibar",
@@ -98,8 +101,9 @@ A_DESCR = {
     "TEY": "turbine energy yield in megawatt hours",
     "CDP": "compressor discharge pressure in millibar",
 }
-# Plant B: same physical sensors, renamed tag codes + PARAPHRASED descriptions. The codes
-# are meaningless; only the descriptions carry semantics, and they never reuse A's wording.
+# Plant B: same physical sensors, renamed tag codes + PARAPHRASED descriptions. The
+# codes are meaningless; only the descriptions carry semantics, never reusing A's
+# wording.
 B_SCHEMA = {  # A_code -> (B_tag_code, B_description)
     "AT": ("TAG_017", "outdoor intake air temperature, deg c"),
     "AP": ("TAG_004", "local atmospheric pressure, mbar"),
@@ -125,7 +129,8 @@ def load_turbine():
 
 
 def standardize(train, *others, cols):
-    """Z-score `cols` (and target) using train statistics; return scaled copies + tscale."""
+    """Z-score `cols` (and target) using train statistics; return scaled copies +
+    tscale."""
     mu, sd = train[cols].mean(), train[cols].std().replace(0, 1)
     tmu, tsd = train[TARGET].mean(), train[TARGET].std() or 1.0
 
@@ -139,7 +144,10 @@ def standardize(train, *others, cols):
 
 
 def make_plant_b(df_a_rows: pd.DataFrame, shuffle_seed: int = 7):
-    """Relabel Plant A columns to Plant B's renamed, reordered schema. Returns (df, descr)."""
+    """Relabel Plant A columns to Plant B's renamed, reordered schema.
+
+    Returns (df, descr).
+    """
     rename = {a: B_SCHEMA[a][0] for a in A_CODES}
     descr = {B_SCHEMA[a][0]: B_SCHEMA[a][1] for a in A_CODES}
     df = df_a_rows.rename(columns=rename)
@@ -168,7 +176,8 @@ def make_embedder(strategy, descr, feat_cols):
 def fit_regressor(
     fit_df, val_df, cfg, descr, strategy, tag, epochs, patience, src_encoder=None
 ):
-    """Train a SingleRowRegressor; optionally warm-start its encoder from `src_encoder`."""
+    """Train a SingleRowRegressor; optionally warm-start its encoder from
+    `src_encoder`."""
     embedder = make_embedder(strategy, descr, cfg.numeric_col_tokens)
     reg = SingleRowRegressor(
         cfg,
@@ -269,8 +278,8 @@ def main():
         flush=True,
     )
     print(
-        f"  B train-pool {len(b_pool):,} / test {len(b_test):,} | NOx std {tscale_b:.2f} | "
-        f"seeds={seeds} | fractions={a.fractions}\n",
+        f"  B train-pool {len(b_pool):,} / test {len(b_test):,} | "
+        f"NOx std {tscale_b:.2f} | seeds={seeds} | fractions={a.fractions}\n",
         flush=True,
     )
 
@@ -334,7 +343,8 @@ def main():
                 res[frac][arm].append(rmse(m, b_test, cfg_b, tscale_b))
             res[frac]["xgb"].append(xgb_rmse(fit_df, b_test, b_cols, tscale_b, seed))
         row = " | ".join(
-            f"{arm.split('_')[0][:3]}_{arm.split('_')[-1][:3]} {np.mean(res[frac][arm]):.3f}"
+            f"{arm.split('_')[0][:3]}_{arm.split('_')[-1][:3]} "
+            f"{np.mean(res[frac][arm]):.3f}"
             for arm in arms
         )
         print(f"  frac {frac:>5.2f} (n={n_lab:>5}): {row}", flush=True)
@@ -371,7 +381,8 @@ def main():
         flush=True,
     )
     print(
-        f"  (c) transfer_semantic < xgb @ frac={smallest:.2f}: {'PASS' if c_ok else 'FAIL'}",
+        f"  (c) transfer_semantic < xgb @ frac={smallest:.2f}: "
+        f"{'PASS' if c_ok else 'FAIL'}",
         flush=True,
     )
     verdict = (

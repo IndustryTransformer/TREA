@@ -9,8 +9,8 @@ on stat features under two grouped 5-fold splits:
                    benchmark setup — "leaky" wrt wells)
   - well-grouped : a well's files never span train/test (honest)
 
-The macro-F1 gap between them is the well-leakage effect. If file-grouped >> well-grouped,
-every existing 3W number (including RF's 0.92) is optimistic.
+The macro-F1 gap between them is the well-leakage effect. If file-grouped >>
+well-grouped, every existing 3W number (including RF's 0.92) is optimistic.
 
 Run (use --max-files-per-class for a fast pass):
     uv run python scripts/leakage_check.py --max-files-per-class 80
@@ -41,7 +41,10 @@ WELL_RE = re.compile(r"(WELL-\d+)")
 
 
 def window_stats(feat: np.ndarray, w: int) -> np.ndarray:
-    """[T, C] -> [n_win, C*6] nan-aware stats per window (mean/std/min/max/median/nanrate)."""
+    """[T, C] -> [n_win, C*6] nan-aware stats per window.
+
+    (mean/std/min/max/median/nanrate)
+    """
     n = (feat.shape[0] // w) * w
     if n < w:
         return np.empty((0, feat.shape[1] * 6), np.float32)

@@ -34,7 +34,8 @@ MAX_ROWS = 20_000
 MIN_ROWS = 300
 GENERIC = re.compile(r"^(v|x|f|col|attr|feature|att|var)_?\d+$", re.IGNORECASE)
 
-# (source, name/version, optional explicit target col). OpenML default target used if None.
+# (source, name/version, optional explicit target col). OpenML default target used
+# if None.
 CANDIDATES = [
     ("sklearn", "california_housing", None),
     ("sklearn", "diabetes", None),
@@ -122,7 +123,8 @@ def main():
             df = process(X, y)
             if df is None:
                 print(
-                    f"  SKIP  {name:32s} (no regression target / generic names / too small)",
+                    f"  SKIP  {name:32s} "
+                    "(no regression target / generic names / too small)",
                     flush=True,
                 )
                 continue
@@ -152,7 +154,8 @@ def main():
     if manifest:
         tot = sum(m["n_rows"] for m in manifest)
         print(
-            f"  {tot:,} total rows | feature counts {sorted(m['n_features'] for m in manifest)}",
+            f"  {tot:,} total rows | "
+            f"feature counts {sorted(m['n_features'] for m in manifest)}",
             flush=True,
         )
     if len(manifest) < 4:

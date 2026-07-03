@@ -187,7 +187,8 @@ def main():
     for k in ("scratch", "pre", "xgb"):
         v = res[k]
         print(
-            f"  {k:>7}: {np.mean(v):.3f} +/- {np.std(v):.3f}  (min {min(v):.3f}, max {max(v):.3f})",
+            f"  {k:>7}: {np.mean(v):.3f} +/- {np.std(v):.3f}  "
+            f"(min {min(v):.3f}, max {max(v):.3f})",
             flush=True,
         )
     deep = min(np.mean(res["scratch"]), np.mean(res["pre"]))

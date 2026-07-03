@@ -5,12 +5,14 @@ vetted "good examples" for tabular ML, so results are diverse and comparable:
   - OpenML-CC18  (study 99):  72 curated classification datasets
 
 For each dataset: keep numeric features, cap rows/features, detect task, and record a
-`meaningful` flag (fraction of non-generic column names) + `task`. The full set firms up
-"single-row deep vs trees in error bands" (names irrelevant); the meaningful-named subset
-feeds the semantic-column / schema-scaling work. Categorical FEATURES are dropped for now
-(numeric-only corpus, consistent with the existing 15) but their count is recorded.
+`meaningful` flag (fraction of non-generic column names) + `task`. The full set firms
+up "single-row deep vs trees in error bands" (names irrelevant); the meaningful-named
+subset feeds the semantic-column / schema-scaling work. Categorical FEATURES are
+dropped for now (numeric-only corpus, consistent with the existing 15) but their count
+is recorded.
 
-Writes parquet per dataset + merges into data/tabular_corpus/manifest.json (dedup by name).
+Writes parquet per dataset + merges into data/tabular_corpus/manifest.json (dedup by
+name).
 
 Run:  uv run python scripts/download_openml_suites.py
 """
@@ -150,8 +152,8 @@ def main():
             mf = rec["meaningful"]
             tag = "MEANINGFUL" if mf >= 0.6 else "generic   "
             print(
-                f"  OK   id={did:>7} {name:36s} {rec['n_rows']:>6}x{rec['n_features']:<3} "
-                f"{tag} ({mf:.2f})",
+                f"  OK   id={did:>7} {name:36s} "
+                f"{rec['n_rows']:>6}x{rec['n_features']:<3} {tag} ({mf:.2f})",
                 flush=True,
             )
 

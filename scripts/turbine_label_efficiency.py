@@ -104,8 +104,8 @@ def main():
         print(f"{frac:>6.2f} {n_lab:>9,} {np.mean(rmses):>14.3f} ± {np.std(rmses):.3f}")
 
     print(
-        "\nThis is the bar. The pretrained->finetuned model must beat the low-frac rows "
-        "(≤10%) to satisfy the kill criterion (docs/LESSONS.md §3)."
+        "\nThis is the bar. The pretrained->finetuned model must beat the low-frac "
+        "rows (≤10%) to satisfy the kill criterion (docs/LESSONS.md §3)."
     )
 
 

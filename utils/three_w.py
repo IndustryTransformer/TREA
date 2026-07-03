@@ -158,7 +158,7 @@ class ThreeWDataset(Dataset):
         # Load all files with clean_data=False to preserve NaN values
         config = ParquetDatasetConfig(
             path=data_path,
-            split=None,  # load all files (train/val/test split not implemented in toolkit)
+            split=None,  # load all files (train/val/test split not implemented)
             clean_data=False,
             target_column="class",
             seed=seed,
@@ -231,10 +231,12 @@ class ThreeWDataset(Dataset):
                         rare_classes.add(cls_id)
             if rare_classes:
                 print(
-                    f"  Rare classes (< {self.RARE_CLASS_FILE_THRESHOLD} files): {sorted(rare_classes)}"
+                    f"  Rare classes (< {self.RARE_CLASS_FILE_THRESHOLD} files): "
+                    f"{sorted(rare_classes)}"
                 )
                 print(
-                    f"  Using stride={rare_class_stride} for rare classes, stride={stride} otherwise"
+                    f"  Using stride={rare_class_stride} for rare classes, "
+                    f"stride={stride} otherwise"
                 )
 
         # Extract windows from each file
@@ -318,7 +320,8 @@ class ThreeWDataset(Dataset):
 
             if (i + 1) % 200 == 0 or i == n_files - 1:
                 print(
-                    f"  Processed {i + 1}/{n_files} files, {len(all_windows)} windows so far"
+                    f"  Processed {i + 1}/{n_files} files, "
+                    f"{len(all_windows)} windows so far"
                 )
 
         self.windows = np.array(all_windows, dtype=np.float32)  # [N, C, T]
@@ -333,7 +336,8 @@ class ThreeWDataset(Dataset):
                 "No valid windows were extracted from the selected files."
             )
 
-        # Keep train-selected feature subset aligned across splits via normalization_stats.
+        # Keep train-selected feature subset aligned across splits via
+        # normalization_stats.
         if normalization_stats is not None:
             if "feature_indices" in normalization_stats:
                 self.feature_indices = np.asarray(
@@ -403,8 +407,9 @@ class ThreeWDataset(Dataset):
                 or self.std.shape[0] != self.n_features
             ):
                 raise ValueError(
-                    "Normalization stats feature dimension does not match active features. "
-                    "Pass train_ds.normalization_stats from the same feature selection."
+                    "Normalization stats feature dimension does not match active "
+                    "features. Pass train_ds.normalization_stats from the same "
+                    "feature selection."
                 )
             self.std[self.std == 0] = 1.0
             print("  Using pre-computed normalization stats")
