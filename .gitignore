@@ -26,4 +26,9 @@ cache/
 
 # generated run artifacts (results + logs at repo root; reproducible)
 /*_results.json
+/*_results*.json
 /*_run.log
+# CatBoost auto-writes a training-log dir on fit
+catboost_info/
+# in-repo git worktrees from the WO merge (remove with `git worktree remove`)
+/worktree_*/
