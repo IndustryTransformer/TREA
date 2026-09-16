@@ -47,7 +47,7 @@ DEEP_MODELS = {
     "trea_triple",
     "trea_triple_stat_tokens",
 }
-CLASSICAL_MODELS = {"rf", "lof"}
+CLASSICAL_MODELS = {"rf", "lof", "tabicl"}
 ALL_MODELS = DEEP_MODELS | CLASSICAL_MODELS
 
 
@@ -199,6 +199,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rf-n-estimators", type=int, default=500)
     parser.add_argument("--rf-n-jobs", type=int, default=-1)
     parser.add_argument("--rf-train-max-samples", type=int, default=200000)
+    parser.add_argument(
+        "--tabicl-train-max-samples",
+        type=int,
+        default=20000,
+        help="Random cap on train windows given to TabICL (in-context; same "
+        "hand-stat features as RF).",
+    )
     parser.add_argument("--lof-n-neighbors", type=int, default=20)
     parser.add_argument("--lof-train-max-samples", type=int, default=50000)
 
@@ -213,9 +220,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def extract_engineered_features(windows: np.ndarray) -> np.ndarray:
-    """Create fixed-size feature vectors from [N, C, T] windows."""
-    x = windows
+def extract_engineered_features(
+    windows: np.ndarray, chunk: int = 50_000
+) -> np.ndarray:
+    """Create fixed-size feature vectors from [N, C, T] windows.
+
+    Chunked: the nan-reductions below allocate several full-size temporaries, which
+    OOM-killed a 645k-window run (48 GB RSS) when done in one shot.
+    """
+    if len(windows) > chunk:
+        return np.concatenate(
+            [
+                extract_engineered_features(windows[i : i + chunk], chunk)
+                for i in range(0, len(windows), chunk)
+            ],
+            axis=0,
+        )
+    x = np.asarray(windows, dtype=np.float32)
     with np.errstate(invalid="ignore", divide="ignore"):
         mean = np.nanmean(x, axis=2)
         std = np.nanstd(x, axis=2)
@@ -442,6 +463,40 @@ def run_rf_baseline(
     score = (
         proba[:, classes.index(1)] if 1 in classes else np.zeros(len(x_val))
     )
+    metrics = binary_metrics(pred, y_val, score)
+    metrics["train_seconds"] = train_seconds
+    metrics["num_params"] = 0
+    return metrics
+
+
+def run_tabicl_baseline(
+    train_ds: ThreeWDataset,
+    val_ds: ThreeWDataset,
+    seed: int,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    """TabICL (pretrained in-context tabular classifier) on the SAME hand-stat
+    features as RF. Pretrained-ICL baseline for the well-disjoint gate."""
+    from tabicl import TabICLClassifier
+
+    rng = np.random.default_rng(seed)
+    x_train = extract_engineered_features(train_ds.windows)
+    y_train = train_ds.labels.copy()
+    x_val = extract_engineered_features(val_ds.windows)
+    y_val = val_ds.labels.copy()
+    cap = args.tabicl_train_max_samples
+    if cap and len(y_train) > cap:
+        idx = rng.choice(len(y_train), size=cap, replace=False)
+        x_train, y_train = x_train[idx], y_train[idx]
+
+    clf = TabICLClassifier(device="cuda" if torch.cuda.is_available() else "cpu")
+    t0 = time.perf_counter()
+    clf.fit(x_train, y_train)
+    proba = clf.predict_proba(x_val)
+    train_seconds = time.perf_counter() - t0
+    classes = list(clf.classes_)
+    score = proba[:, classes.index(1)] if 1 in classes else np.zeros(len(x_val))
+    pred = (score >= 0.5).astype(np.int64)
     metrics = binary_metrics(pred, y_val, score)
     metrics["train_seconds"] = train_seconds
     metrics["num_params"] = 0
@@ -707,6 +762,13 @@ def main() -> None:
                 )
             elif model_name == "rf":
                 metrics = run_rf_baseline(
+                    train_ds=train_ds,
+                    val_ds=val_ds,
+                    seed=seed,
+                    args=args,
+                )
+            elif model_name == "tabicl":
+                metrics = run_tabicl_baseline(
                     train_ds=train_ds,
                     val_ds=val_ds,
                     seed=seed,

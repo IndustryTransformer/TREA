@@ -245,10 +245,13 @@ See `docs/3w_literature_benchmarks.csv` for full details with source URLs.
 Class 2 (Spurious Closure of DHSV) is notoriously difficult for all models due to
 very few real instances (22 real + 16 simulated files).
 
-### Current Training Setup (`train_w3.py` at repo root — the canonical 3W script)
+### Current Training Setup (`train_w3.py` at repo root — the canonical 3W entrypoint)
 
-Note the filename quirk: the dataset is "3W" but the script is `train_w3.py`. An older
-copy exists at `examples/train_3w.py`; prefer the root `train_w3.py` (kept current).
+Note the filename quirk: the dataset is "3W" but the stable entrypoint is
+`train_w3.py`. It is a thin compatibility wrapper around the maintained
+implementation in `examples/train_3w.py`. Do not revive the older row-level parquet
+loader: it built split-local label mappings and made validation invalid on
+well-disjoint splits.
 
 - Window: T=96, stride=96 (non-overlapping)
 - Architecture: d_model=256, n_head=8, num_layers=4, dropout=0.3
@@ -290,7 +293,8 @@ as possibly optimistic until re-run under these rules:
 - **trea/**: Core library (`models/`, `training/`, `utils/` package internals)
 - **utils/** (repo root, separate from `trea/utils/`): data handling — datamodules,
   dataset bases, 3W loaders. See "Two `utils` locations" above.
-- **train_w3.py** (repo root): canonical 3W training script
+- **train_w3.py** (repo root): canonical 3W training entrypoint, delegating to
+  `examples/train_3w.py`
 - **examples/**: usage examples, dataset downloaders, and one-off train/diagnose scripts
   (DO NOT RUN these directly — tqdm output overflows the context window)
 - **scripts/**: pretraining, fine-tuning, evaluation, and dataset-download utilities
