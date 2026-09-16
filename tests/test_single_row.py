@@ -374,6 +374,11 @@ def test_hl_gauss_vs_mse_performance():
             head=head,
             y_train=df["target"].values if head == "hl_gauss" else None,
             hl_gauss_bins=30,
+            # This loss-ranking experiment was calibrated on the legacy encoder.
+            # Keep it fixed; new default wiring/forward behavior is tested separately.
+            fusion="additive",
+            first_prenormalization=True,
+            dropout=0.2,
             lr=0.02,
         )
         trainer, _ = build_trainer(max_epochs=30, patience=None)
@@ -695,6 +700,7 @@ def test_copy_encoder_weights_excludes_numeric_quantiles():
         n_heads=N_HEADS,
         n_layers=N_LAYERS,
         value_encoder="dual",
+        fusion="additive",
     )
     dst = SingleRowRegressor(
         cfg_dst,
@@ -702,6 +708,7 @@ def test_copy_encoder_weights_excludes_numeric_quantiles():
         n_heads=N_HEADS,
         n_layers=N_LAYERS,
         value_encoder="dual",
+        fusion="additive",
     )
     dst_quantiles_before = dst.model.tabular_encoder.numeric_quantiles.clone()
     copy_encoder_weights(

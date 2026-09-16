@@ -1,14 +1,15 @@
 """Head-to-head: single-row deep model vs XGBoost / RandomForest.
 
-The goal-1 bar: is the deep model "as good as trees, in error bands"? Regression -> test
+The goal-1 bar: is the deep model within a practical margin of trees? Regression -> test
 RMSE (original target units), classification -> test macro-F1. Multi-seed mean+-std per
 model per dataset, then an aggregate: on how many datasets does the deep model
-TIE-OR-BEAT the best tree (within one deep std -> "not significantly worse")?
+fall within explicit practical margins of the best tree? These are descriptive
+margins, not statistical equivalence tests.
 
 Notes:
-  - Deep = from-scratch SingleRowRegressor / SingleRowClassifier (MTM pretraining is the
-    next lever but needs the no-categorical MTM fix; this is the honest scratch
-    baseline).
+  - Deep = from-scratch SingleRowRegressor / SingleRowClassifier.
+  - Every arm fits the same rows; validation selects the deep checkpoint only.
+    Preprocessing and quantiles use fit rows only. No hyperparameter search.
   - Missing cells: the deep model handles NaN natively (present-flag); trees get
     the same standardized features with NaN mean-imputed (post-standardization 0).
     Features clipped to +-8 to tame outliers.
@@ -69,8 +70,8 @@ from trea.utils.single_row_data import (  # noqa: E402
 
 
 CORPUS = Path(__file__).resolve().parent.parent / "data" / "tabular_corpus"
-RESULTS = Path(__file__).resolve().parent.parent / "tabular_vs_trees_results.json"
-D_MODEL, N_HEADS, N_LAYERS, LR, BATCH = 128, 4, 3, 8e-4, 256
+RESULTS = Path(__file__).resolve().parent.parent / "tabular_vs_trees_results.fair.json"
+D_MODEL, N_HEADS, N_LAYERS, LR, BATCH = 128, 4, 2, 3e-4, 256
 
 
 def load_corpus(tasks):
@@ -84,11 +85,31 @@ def load_corpus(tasks):
     return man, out
 
 
-def prep(df, feat, task, seed):
+def fit_val_indices(y, task, seed):
+    return train_test_split(
+        np.arange(len(y)),
+        test_size=0.2,
+        random_state=seed,
+        stratify=y if task == "classification" else None,
+    )
+
+
+def prep(df, feat, task, seed, *, fit_only=False):
     """Split + standardize, with NaN kept; label-encode classification target."""
     strat = df["__target__"] if task == "classification" else None
     tr, te = train_test_split(df, test_size=0.3, random_state=seed, stratify=strat)
-    mu, sd = tr[feat].mean(), tr[feat].std().replace(0, 1)
+    # Legacy callers retain outer-train scaling; the fair harness opts into
+    # fit-only statistics using the exact same inner split as all model arms.
+    stats = tr
+    if fit_only:
+        labels = (
+            tr["__target__"].astype(str)
+            if task == "classification"
+            else tr["__target__"]
+        )
+        fit_i, _ = fit_val_indices(labels, task, seed)
+        stats = tr.iloc[fit_i]
+    mu, sd = stats[feat].mean(), stats[feat].std().replace(0, 1)
 
     def sx(d):
         X = np.clip(((d[feat] - mu) / sd).to_numpy(np.float32), -8.0, 8.0)
@@ -96,7 +117,7 @@ def prep(df, feat, task, seed):
 
     Xtr, Xte = sx(tr), sx(te)
     if task == "regression":
-        tmu, tsd = tr["__target__"].mean(), tr["__target__"].std() or 1.0
+        tmu, tsd = stats["__target__"].mean(), stats["__target__"].std() or 1.0
         ytr = ((tr["__target__"] - tmu) / tsd).to_numpy(np.float32)
         yte = ((te["__target__"] - tmu) / tsd).to_numpy(np.float32)
         return Xtr, ytr, Xte, yte, float(tsd), None
@@ -141,20 +162,21 @@ def deep_score(
     bin_spacing="uniform",
     symlog=False,
     value_encoder="identity",
-    fusion="additive",
+    fusion="product_sum",
     label_smoothing=0.0,
     logit_adjustment_tau=1.0,
     warmup_frac=0.05,
     ensemble_k=0,
+    lr=LR,
+    dropout=0.0,
+    first_prenormalization=False,
+    n_layers=N_LAYERS,
 ):
     L.seed_everything(seed, verbose=False)
-    fit_i, val_i = train_test_split(
-        np.arange(len(Xtr)),
-        test_size=0.2,
-        random_state=seed,
-        stratify=ytr if task == "classification" else None,
+    fit_i, val_i = fit_val_indices(ytr, task, seed)
+    cfg = SingleRowConfig.generate(
+        _frame(Xtr[fit_i], ytr[fit_i], feat), target="__target__"
     )
-    cfg = SingleRowConfig.generate(_frame(Xtr, ytr, feat), target="__target__")
 
     def loader(idx, shuffle):
         ds = TabularDS(_frame(Xtr[idx], ytr[idx], feat), cfg)
@@ -167,14 +189,16 @@ def deep_score(
             cfg,
             d_model=D_MODEL,
             n_heads=N_HEADS,
-            n_layers=N_LAYERS,
-            lr=LR,
+            n_layers=n_layers,
+            lr=lr,
+            dropout=dropout,
             head=head,
             y_train=ytr[fit_i],
             bin_spacing=bin_spacing,
             symlog=symlog,
             value_encoder=value_encoder,
             fusion=fusion,
+            first_prenormalization=first_prenormalization,
             warmup_frac=warmup_frac,
             ensemble_k=ensemble_k,
         )
@@ -184,13 +208,15 @@ def deep_score(
             num_classes=n_classes,
             d_model=D_MODEL,
             n_heads=N_HEADS,
-            n_layers=N_LAYERS,
-            lr=LR,
+            n_layers=n_layers,
+            lr=lr,
+            dropout=dropout,
             class_priors=_class_priors(ytr[fit_i], n_classes),
             logit_adjustment_tau=logit_adjustment_tau,
             label_smoothing=label_smoothing,
             value_encoder=value_encoder,
             fusion=fusion,
+            first_prenormalization=first_prenormalization,
             warmup_frac=warmup_frac,
             ensemble_k=ensemble_k,
         )
@@ -236,7 +262,9 @@ def deep_score(
     P = np.concatenate(preds)
     if task == "regression":
         # WO-5: clip test-time predictions to the observed train target range.
-        pred = np.clip(P.ravel(), float(np.nanmin(ytr)), float(np.nanmax(ytr)))
+        pred = np.clip(
+            P.ravel(), float(np.nanmin(ytr[fit_i])), float(np.nanmax(ytr[fit_i]))
+        )
         return {
             "score": float(np.sqrt(mean_squared_error(yte, pred))) * tscale,
             "collapsed": False,
@@ -329,7 +357,7 @@ def _score_dataset(payload):
     row = {"deep": [], "xgb": [], "rf": [], "cat": [], "seed_results": []}
     try:
         for seed in range(cfg["seeds"]):
-            Xtr, ytr, Xte, yte, tscale, nc = prep(df, feat, task, seed)
+            Xtr, ytr, Xte, yte, tscale, nc = prep(df, feat, task, seed, fit_only=True)
             deep = deep_score(
                 Xtr,
                 ytr,
@@ -351,15 +379,44 @@ def _score_dataset(payload):
                 logit_adjustment_tau=cfg["logit_adjustment_tau"],
                 warmup_frac=cfg["warmup_frac"],
                 ensemble_k=cfg["ensemble_k"],
+                lr=cfg["lr"],
+                dropout=cfg["dropout"],
+                first_prenormalization=cfg.get("first_prenormalization", False),
+                n_layers=cfg.get("n_layers", N_LAYERS),
             )
+            fit_i, val_i = fit_val_indices(ytr, task, seed)
             xgb = tree_score(
-                "xgb", Xtr, ytr, Xte, yte, task, tscale, seed, cfg["tree_jobs"]
+                "xgb",
+                Xtr[fit_i],
+                ytr[fit_i],
+                Xte,
+                yte,
+                task,
+                tscale,
+                seed,
+                cfg["tree_jobs"],
             )
             rf = tree_score(
-                "rf", Xtr, ytr, Xte, yte, task, tscale, seed, cfg["tree_jobs"]
+                "rf",
+                Xtr[fit_i],
+                ytr[fit_i],
+                Xte,
+                yte,
+                task,
+                tscale,
+                seed,
+                cfg["tree_jobs"],
             )
             cat = tree_score(
-                "cat", Xtr, ytr, Xte, yte, task, tscale, seed, cfg["tree_jobs"]
+                "cat",
+                Xtr[fit_i],
+                ytr[fit_i],
+                Xte,
+                yte,
+                task,
+                tscale,
+                seed,
+                cfg["tree_jobs"],
             )
             row["deep"].append(deep["score"])
             row["xgb"].append(xgb)
@@ -368,6 +425,9 @@ def _score_dataset(payload):
             row["seed_results"].append(
                 {
                     "seed": seed,
+                    "n_fit": len(fit_i),
+                    "n_val": len(val_i),
+                    "n_test": len(yte),
                     "deep": deep["score"],
                     "xgb": xgb,
                     "rf": rf,
@@ -382,6 +442,8 @@ def _score_dataset(payload):
     rec = {
         "name": name,
         "task": task,
+        "protocol": "shared-fit-v2",
+        "config": cfg,
         "n_rows": m["n_rows"],
         "n_features": len(feat),
     }
@@ -390,6 +452,9 @@ def _score_dataset(payload):
     rec["seed_results"] = row["seed_results"]
     rec["collapsed"] = any(s["collapsed"] for s in row["seed_results"])
     rec["collapsed_seeds"] = [s["seed"] for s in row["seed_results"] if s["collapsed"]]
+    rec["comparison"] = practical_comparison(
+        rec, cfg["classification_margin"], cfg["regression_margin"]
+    )
     return i, rec
 
 
@@ -398,20 +463,33 @@ def _best_tree(rec, higher):
     return max(scores) if higher else min(scores)
 
 
+def practical_comparison(rec, classification_margin=0.01, regression_margin=0.02):
+    """Descriptive practical gap, independent of seed variance; not a p-value.
+
+    Best tree is the test-score envelope, not a validation-selected deployable model.
+    """
+    higher = rec["task"] == "classification"
+    best = _best_tree(rec, higher)
+    gap = best - rec["deep"] if higher else rec["deep"] - best
+    margin = classification_margin if higher else regression_margin * abs(best)
+    return {
+        "best_tree": best,
+        "gap": gap,
+        "margin": margin,
+        "within_margin_or_better": bool(gap <= margin),
+        "strict_win": bool(gap < 0),
+    }
+
+
 def _print_row(i, rec):
     higher = rec["task"] == "classification"
-    best_tree = _best_tree(rec, higher)
-    tie = (
-        (rec["deep"] >= best_tree - rec["deep_std"])
-        if higher
-        else (rec["deep"] <= best_tree + rec["deep_std"])
-    )
+    close = rec["comparison"]["within_margin_or_better"]
     metric = "F1" if higher else "RMSE"
     print(
         f"[{i:>2}] {rec['name']:34s} {rec['task'][:3]} {metric} "
         f"deep {rec['deep']:.3f}±{rec['deep_std']:.3f} "
         f"| xgb {rec['xgb']:.3f} rf {rec['rf']:.3f} cat {rec['cat']:.3f} "
-        f"| {'TIE/WIN' if tie else 'loss'}",
+        f"| {'WITHIN MARGIN/WIN' if close else 'outside margin'}",
         flush=True,
     )
 
@@ -423,11 +501,30 @@ def main():
     ap.add_argument("--head", choices=["mse", "hl_gauss"], default="mse")
     ap.add_argument("--bin-spacing", choices=["uniform", "quantile"], default="uniform")
     ap.add_argument("--symlog", action="store_true")
-    ap.add_argument("--value-encoder", choices=["identity", "dual"], default="identity")
-    ap.add_argument("--fusion", choices=["additive", "hadamard"], default="additive")
+    ap.add_argument(
+        "--value-encoder",
+        choices=["identity", "ple", "periodic", "dual"],
+        default="identity",
+    )
+    ap.add_argument(
+        "--fusion",
+        choices=["additive", "hadamard", "product", "product_sum"],
+        default="product_sum",
+    )
     ap.add_argument("--label-smoothing", type=float, default=0.0)
     ap.add_argument("--logit-adjustment-tau", type=float, default=1.0)
     ap.add_argument("--warmup-frac", type=float, default=0.05)
+    ap.add_argument(
+        "--first-prenormalization",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Restore first attention-input LayerNorm (off by default).",
+    )
+    ap.add_argument("--lr", type=float, default=LR)
+    ap.add_argument("--dropout", type=float, default=0.0)
+    ap.add_argument("--n-layers", type=int, default=N_LAYERS)
+    ap.add_argument("--epochs", type=int, default=300)
+    ap.add_argument("--patience", type=int, default=30)
     ap.add_argument(
         "--ensemble-k",
         type=int,
@@ -441,9 +538,30 @@ def main():
         help="Parallel dataset workers sharing the GPU (1=serial). The tiny models "
         "leave the GPU ~90%% idle; 6-8 workers usually gives a near-linear speedup.",
     )
+    ap.add_argument(
+        "--classification-margin",
+        type=float,
+        default=0.01,
+        help="Absolute macro-F1 practical margin (not significance).",
+    )
+    ap.add_argument(
+        "--regression-margin",
+        type=float,
+        default=0.02,
+        help="Relative RMSE practical margin (not significance).",
+    )
+    ap.add_argument("--output", type=Path, default=RESULTS)
     ap.add_argument("--smoke", action="store_true")
     a = ap.parse_args()
-    epochs, patience = (3, 2) if a.smoke else (100, 16)
+    if not all(
+        np.isfinite(v) and v >= 0
+        for v in (a.classification_margin, a.regression_margin)
+    ):
+        ap.error("Performance margins must be finite and nonnegative")
+    if a.output.exists():
+        ap.error(f"Refusing to overwrite {a.output}; choose a fresh --output")
+    a.output.parent.mkdir(parents=True, exist_ok=True)
+    epochs, patience = (3, 2) if a.smoke else (a.epochs, a.patience)
     if a.smoke:
         a.seeds = 2
 
@@ -475,8 +593,14 @@ def main():
         "label_smoothing": a.label_smoothing,
         "logit_adjustment_tau": a.logit_adjustment_tau,
         "warmup_frac": a.warmup_frac,
+        "lr": a.lr,
+        "dropout": a.dropout,
+        "n_layers": a.n_layers,
+        "first_prenormalization": a.first_prenormalization,
         "ensemble_k": a.ensemble_k,
         "tree_jobs": tree_jobs,
+        "classification_margin": a.classification_margin,
+        "regression_margin": a.regression_margin,
     }
     payloads = [(i, m, cfg) for i, m in enumerate(datasets)]
     by_index = {}
@@ -491,7 +615,7 @@ def main():
         by_index[i] = res
         _print_row(i, res)
         # Write in original dataset order regardless of completion order.
-        RESULTS.write_text(
+        a.output.write_text(
             json.dumps([by_index[j] for j in sorted(by_index)], indent=2)
         )
 
@@ -514,35 +638,23 @@ def main():
 
     # ---- aggregate ----
     print(
-        "\n=== AGGREGATE: deep vs best tree (tie = within one deep std) ===", flush=True
+        "\n=== AGGREGATE: deep vs best-tree test envelope "
+        "(practical margins; not significance) ===",
+        flush=True,
     )
     for task in a.tasks:
         rows = [r for r in results if r["task"] == task]
         if not rows:
             continue
-        higher = task == "classification"
-
-        def tie(r, higher=higher):
-            bt = _best_tree(r, higher)
-            return (
-                (r["deep"] >= bt - r["deep_std"])
-                if higher
-                else (r["deep"] <= bt + r["deep_std"])
-            )
-
-        def win(r, higher=higher):
-            bt = _best_tree(r, higher)
-            return (r["deep"] > bt) if higher else (r["deep"] < bt)
-
         n = len(rows)
-        n_tie = sum(tie(r) for r in rows)
-        n_win = sum(win(r) for r in rows)
+        n_tie = sum(r["comparison"]["within_margin_or_better"] for r in rows)
+        n_win = sum(r["comparison"]["strict_win"] for r in rows)
         print(
-            f"  {task:14s} n={n:>2} | deep ties-or-beats best tree on "
+            f"  {task:14s} n={n:>2} | deep within margin of or beats best tree on "
             f"{n_tie}/{n} | strictly beats on {n_win}/{n}",
             flush=True,
         )
-    print(f"\nresults -> {RESULTS}", flush=True)
+    print(f"\nresults -> {a.output}", flush=True)
 
 
 if __name__ == "__main__":

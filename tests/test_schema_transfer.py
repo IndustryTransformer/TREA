@@ -227,16 +227,17 @@ def test_column_permutation_invariance(semantic):
 
 def test_zero_value_keeps_column_identity():
     # The failure mode of `value * embedding`: at value 0 the numeric token is the zero
-    # vector, so column identity is lost. With `identity + proj([value, present])` a
-    # value of 0 yields a NON-zero token whose identity still distinguishes columns.
+    # vector. The new default adds an independent feature bias, preserving distinct
+    # nonzero tokens at an observed value of zero.
     cfg, _ = _cfg_and_df(A_CODES)
     emb = SemanticColumnEmbedder([A_DESCR[c] for c in A_CODES], d_model=D)
     enc = TabularEncoder(cfg, D, 2, 1, col_embedder=emb, column_descriptions=A_DESCR)
-    value_vec = enc.num_value_proj(torch.tensor([[0.0, 1.0]]))  # value 0, present
     ids = emb(enc.numeric_texts)
-    assert value_vec.abs().sum() > 1e-6  # value 0 does not zero the token
-    tok0, tok1 = ids[0] + value_vec[0], ids[1] + value_vec[0]
-    assert not torch.allclose(tok0, tok1, atol=1e-4)  # identity preserved at value 0
+    zero_tokens = enc.product_bias(
+        ids
+    )  # x * identity vanishes, independent bias remains
+    assert zero_tokens.abs().sum() > 1e-6
+    assert not torch.allclose(zero_tokens[0], zero_tokens[1], atol=1e-4)
 
 
 def test_nan_and_inf_treated_as_missing(semantic):

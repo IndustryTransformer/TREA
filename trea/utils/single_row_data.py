@@ -61,7 +61,7 @@ class SingleRowConfig:
             q = np.linspace(0, 1, 65)
             q_arr = []
             for c in numeric_cols:
-                vals = df[c].dropna()
+                vals = df.loc[np.isfinite(df[c]), c]
                 if len(vals) > 0:
                     q_arr.append(np.quantile(vals, q))
                 else:

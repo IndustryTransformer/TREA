@@ -1,10 +1,13 @@
 """Single-row (non-time-series) tabular model for TREA.
 
-A clean, minimal port of the Hephaestus single-row encoder. The idea: every column
-is a token whose *name* is embedded (feature identity); a numeric value is projected
-into d_model by a shared dense layer over [value, present] and ADDED to its column
-identity (never scalar-times-vector -- that loses identity at value 0), categoricals
-embed their value, and a transformer cross-attends column identity against the values.
+Every column is a token whose name is embedded (feature identity). The provisional
+numeric default is value * identity + an independent feature bias, with a dedicated
+missing-value representation and no first attention-input normalization. Legacy
+additive and learned nonlinear encodings remain selectable. Categoricals embed
+their value; a transformer cross-attends column identity against the values.
+The provisional compact default uses two width-128 blocks and zero dropout,
+selected jointly with training settings on NOx, not a depth-only ablation.
+See docs/NOX_REFERENCE_MODELS.md and docs/NOX_TEMPORAL_PRETRAINING.md.
 The column-identity embedding is exactly where semantic / text-derived column
 embeddings plug in to enable cross-schema transfer -- the one thing trees cannot do.
 
@@ -69,6 +72,7 @@ class TransformerEncoderLayer(nn.Module):
         dropout=0.2,
         qk_norm: bool = True,
         pre_norm: bool = True,
+        attention_prenorm: bool = True,
     ):
         super().__init__()
         self.n_heads = n_heads
@@ -77,6 +81,7 @@ class TransformerEncoderLayer(nn.Module):
             raise ValueError("d_model must be divisible by n_heads")
         self.qk_norm = qk_norm
         self.pre_norm = pre_norm
+        self.attention_prenorm = attention_prenorm
         self.attn = nn.MultiheadAttention(
             d_model, n_heads, batch_first=True, dropout=dropout
         )
@@ -141,9 +146,10 @@ class TransformerEncoderLayer(nn.Module):
 
     def forward(self, q, k, v):
         if self.pre_norm:
-            qn = self.norm1(q)
-            kn = self.norm1(k)
-            vn = self.norm1(v)
+            if self.attention_prenorm:
+                qn, kn, vn = self.norm1(q), self.norm1(k), self.norm1(v)
+            else:
+                qn, kn, vn = q, k, v
             out1 = q + self._attention(qn, kn, vn)
             return out1 + self.feed_forward(self.norm2(out1))
 
@@ -165,21 +171,28 @@ class TabularEncoder(nn.Module):
         config,
         d_model=128,
         n_heads=4,
-        n_layers=4,
-        dropout=0.2,
+        n_layers=2,
+        dropout=0.0,
         col_embedder=None,
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
         value_encoder="identity",
-        fusion="additive",
+        fusion="product_sum",
         ensemble_k=0,
+        first_prenormalization: bool = False,
     ):
         super().__init__()
         self.config = config
         self.d_model = d_model
         self.n_cat_cols = config.n_cat_cols
         self.n_numeric_cols = config.n_numeric_cols
+        if value_encoder not in {"identity", "dual", "ple", "periodic"}:
+            raise ValueError(f"Unknown value_encoder: {value_encoder}")
+        if fusion not in {"additive", "hadamard", "product", "product_sum"}:
+            raise ValueError(f"Unknown fusion: {fusion}")
+        if fusion in {"product", "product_sum"} and value_encoder != "identity":
+            raise ValueError("Scalar product fusion requires value_encoder='identity'")
         self.value_encoder = value_encoder
         self.fusion = fusion
 
@@ -223,19 +236,27 @@ class TabularEncoder(nn.Module):
         self.col_texts = [descr.get(c, c) for c in col_tokens]
         self.numeric_texts = [descr.get(c, c) for c in config.numeric_col_tokens]
 
-        if self.value_encoder == "dual":
-            self.n_bins = 64
-            self.ple_bank = nn.Embedding(self.n_bins, d_model)
-            self.periodic_freqs = nn.Parameter(torch.randn(16))
-            self.periodic_bias = nn.Parameter(torch.randn(16))
-            self.num_value_proj = nn.Linear(2 + d_model + 16, d_model)
-            self.missing_vector = nn.Parameter(torch.zeros(d_model + 16))
-            qs = (
-                config.numeric_quantiles
-                if getattr(config, "numeric_quantiles", None) is not None
-                else torch.zeros(config.n_numeric_cols, 65)
-            )
-            self.register_buffer("numeric_quantiles", qs)
+        # Separate basis options permit one-component-at-a-time ablations.
+        # The dual parameter shapes and initialization order remain unchanged.
+        if self.value_encoder != "identity":
+            basis_dim = 0
+            if self.value_encoder in {"dual", "ple"}:
+                self.n_bins = 64
+                self.ple_bank = nn.Embedding(self.n_bins, d_model)
+                basis_dim += d_model
+            if self.value_encoder in {"dual", "periodic"}:
+                self.periodic_freqs = nn.Parameter(torch.randn(16))
+                self.periodic_bias = nn.Parameter(torch.randn(16))
+                basis_dim += 16
+            self.num_value_proj = nn.Linear(2 + basis_dim, d_model)
+            self.missing_vector = nn.Parameter(torch.zeros(basis_dim))
+            if self.value_encoder in {"dual", "ple"}:
+                qs = (
+                    config.numeric_quantiles
+                    if getattr(config, "numeric_quantiles", None) is not None
+                    else torch.zeros(config.n_numeric_cols, 65)
+                )
+                self.register_buffer("numeric_quantiles", qs)
         else:
             self.num_value_proj = nn.Linear(2, d_model)
 
@@ -244,6 +265,23 @@ class TabularEncoder(nn.Module):
                 nn.Linear(d_model, d_model), nn.ReLU(), nn.Linear(d_model, d_model)
             )
 
+        if self.fusion in {"product", "product_sum"}:
+            # Allocate both arms identically for paired initialization. Product-only
+            # deliberately omits the bias in forward. The bias is independent of
+            # the column vector, so adding it can preserve magnitude after LayerNorm.
+            # Semantic schemas can reorder/change columns without token indices;
+            # derive their independent bias from identity rather than slot lookup.
+            self.product_bias = (
+                nn.Linear(d_model, d_model)
+                if col_embedder is not None
+                else nn.Embedding(config.n_tokens, d_model)
+            )
+            self.product_missing = nn.Parameter(torch.linspace(-0.1, 0.1, d_model))
+
+        # Provisional NOx default (2026-09-16): product + independent bias,
+        # without the first attention-input LayerNorm. That norm can erase scalar
+        # magnitude in product tokens. Keep FFN/QK/later norms and all residuals.
+        # See docs/NOX_FIRST_NORM_ABLATION.md; first_prenormalization=True restores it.
         self.layers = nn.ModuleList(
             [
                 TransformerEncoderLayer(
@@ -252,8 +290,9 @@ class TabularEncoder(nn.Module):
                     dropout,
                     qk_norm=qk_norm,
                     pre_norm=pre_norm,
+                    attention_prenorm=(i > 0 or first_prenormalization),
                 )
-                for _ in range(n_layers)
+                for i in range(n_layers)
             ]
         )
         self.apply(initialize_parameters)
@@ -270,31 +309,29 @@ class TabularEncoder(nn.Module):
         else:
             col_emb = self.embeddings(self.col_indices.unsqueeze(0).expand(b, -1))
 
-        # Numeric value token = column identity + dense projection of [value, present].
-        # Any NON-FINITE input (NaN or +/-inf) is treated as MISSING:
-        # present=0, value 0, so missingness is learned by the projection
-        # (no special token) and identity is never lost. Raw NaN from data is
-        # handled natively -- no pre-conversion required.
+        # Nonfinite inputs are missing. Additive encodings use [value, present];
+        # scalar-product encodings use a dedicated missing vector below.
         missing = ~torch.isfinite(num_inputs)  # [b, n_num]: NaN or inf -> missing
         present = (~missing).to(num_inputs.dtype)
         vals = torch.where(missing, torch.zeros_like(num_inputs), num_inputs)
 
-        if self.value_encoder == "dual":
+        if self.value_encoder != "identity":
             continuous = torch.stack([vals, present], dim=-1)
-            # soft PLE
             x_exp = vals.unsqueeze(-1)
-            qs = self.numeric_quantiles
-            widths = qs[:, 1:] - qs[:, :-1]
-            ple_v = torch.clamp(
-                (x_exp - qs[:, :-1]) / (widths + 1e-8), min=0.0, max=1.0
-            )
-            ple_emb = torch.matmul(ple_v, self.ple_bank.weight)
-            # periodic
-            freqs = self.periodic_freqs.view(1, 1, -1)
-            bias = self.periodic_bias.view(1, 1, -1)
-            periodic_emb = torch.cos(2 * math.pi * freqs * x_exp + bias)
+            bases = []
+            if self.value_encoder in {"dual", "ple"}:
+                qs = self.numeric_quantiles
+                widths = qs[:, 1:] - qs[:, :-1]
+                ple_v = torch.clamp(
+                    (x_exp - qs[:, :-1]) / (widths + 1e-8), min=0.0, max=1.0
+                )
+                bases.append(torch.matmul(ple_v, self.ple_bank.weight))
+            if self.value_encoder in {"dual", "periodic"}:
+                freqs = self.periodic_freqs.view(1, 1, -1)
+                bias = self.periodic_bias.view(1, 1, -1)
+                bases.append(torch.cos(2 * math.pi * freqs * x_exp + bias))
             # missing fallback
-            discrete = torch.cat([ple_emb, periodic_emb], dim=-1)
+            discrete = torch.cat(bases, dim=-1)
             discrete = torch.where(
                 present.unsqueeze(-1).bool(), discrete, self.missing_vector
             )
@@ -312,7 +349,20 @@ class TabularEncoder(nn.Module):
                 self.numeric_indices.unsqueeze(0).expand(b, -1)
             )
 
-        if self.fusion == "hadamard":
+        if self.fusion in {"product", "product_sum"}:
+            base_numeric = vals.unsqueeze(-1) * num_col_emb
+            if self.fusion == "product_sum":
+                bias = self.product_bias(
+                    num_col_emb
+                    if self.col_embedder is not None
+                    else self.numeric_indices
+                )
+                base_numeric = base_numeric + bias
+            # Preserve column identity for missing cells plus a dedicated signal.
+            base_numeric = torch.where(
+                missing.unsqueeze(-1), num_col_emb + self.product_missing, base_numeric
+            )
+        elif self.fusion == "hadamard":
             base_numeric = num_col_emb * self.fusion_mlp(value_vec) + value_vec
         else:
             base_numeric = num_col_emb + value_vec
@@ -368,16 +418,17 @@ class TabularRegressor(nn.Module):
         config,
         d_model=128,
         n_heads=4,
-        n_layers=4,
-        dropout=0.2,
+        n_layers=2,
+        dropout=0.0,
         col_embedder=None,
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
         output_dim=1,
         value_encoder="identity",
-        fusion="additive",
+        fusion="product_sum",
         ensemble_k=0,
+        first_prenormalization: bool = False,
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -392,6 +443,7 @@ class TabularRegressor(nn.Module):
             pre_norm=pre_norm,
             value_encoder=value_encoder,
             fusion=fusion,
+            first_prenormalization=first_prenormalization,
             ensemble_k=ensemble_k,
         )
         self.pooling = AttentionPooling(d_model)
@@ -436,15 +488,16 @@ class TabularClassifier(nn.Module):
         num_classes,
         d_model=128,
         n_heads=4,
-        n_layers=4,
-        dropout=0.2,
+        n_layers=2,
+        dropout=0.0,
         col_embedder=None,
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
         value_encoder="identity",
-        fusion="additive",
+        fusion="product_sum",
         ensemble_k=0,
+        first_prenormalization: bool = False,
     ):
         super().__init__()
         self.tabular_encoder = TabularEncoder(
@@ -459,6 +512,7 @@ class TabularClassifier(nn.Module):
             pre_norm=pre_norm,
             value_encoder=value_encoder,
             fusion=fusion,
+            first_prenormalization=first_prenormalization,
             ensemble_k=ensemble_k,
         )
         self.pooling = AttentionPooling(d_model)
@@ -502,14 +556,15 @@ class MaskedTabularEncoder(nn.Module):
         config,
         d_model=128,
         n_heads=4,
-        n_layers=4,
-        dropout=0.2,
+        n_layers=2,
+        dropout=0.0,
         col_embedder=None,
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
         value_encoder: str = "identity",
-        fusion: str = "additive",
+        fusion: str = "product_sum",
+        first_prenormalization: bool = False,
     ):
         super().__init__()
         self.config = config
@@ -525,6 +580,7 @@ class MaskedTabularEncoder(nn.Module):
             pre_norm=pre_norm,
             value_encoder=value_encoder,
             fusion=fusion,
+            first_prenormalization=first_prenormalization,
         )
         flat = config.n_columns * d_model
         if config.n_cat_cols > 0:

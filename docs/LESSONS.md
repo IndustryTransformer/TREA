@@ -184,9 +184,14 @@ turbine gate is spent. The **§3 KILL clause is NOT triggered** (it requires fai
 
 **What the run actually established (read before citing the FAIL):**
 
-1. **The whole curve — trees included — sits above the target std (11.04):** on this
-   temporal split *nobody beats a constant mean-predictor*. The task is drift-limited,
-   not label-limited; the run measures drift robustness, not label efficiency.
+1. **Baseline correction (2026-09-16):** target standard deviation (11.04 in the
+   earlier notes) is not the future RMSE of a deployable constant predictor.
+   Predicting the 2011–2013 training mean on 2014–2015 gives **13.758 RMSE**;
+   several results in this table beat that baseline. The earlier claim that nobody
+   beat a constant predictor was incorrect. The year shift remains important, but
+   the standard-deviation comparison did not establish that labels cannot help.
+   See `NOX_TEMPORAL_PRETRAINING.md` for the updated diagnostic and per-budget
+   constants calculated using only the labeled fitting rows.
 2. **Deep's full-data i.i.d. win was an i.i.d. artifact.** Same stack: deep 4.31 < xgb
    4.47 on a random split vs deep 14.2 > xgb 12.6 temporal. Deep degrades monotonically
    with more labels (in-distribution val selection under shift); trees are flat and far
@@ -266,3 +271,121 @@ can't compete. Keep that scoping correction in mind when taking further suggesti
 - Reporting accuracy instead of macro-F1.
 - `batch·seq ≥ 65536` (row-encoder attention CUDA grid limit).
 - **Starting a fresh repo when stuck.** Fix in place. No fifth repo.
+
+### 3f. Seed-variance decomposition on turbine NOx (2026-09-15)
+
+`scripts/turbine_seed_decomposition.py` (temporal split, v1 stack lr 8e-4): 3 fixed
+labeled-subset draws × 5 init seeds each, fit/val split held fixed per subset, so
+"between" = std of per-subset means (data draw) and "within" = mean std over inits
+(model/optimizer). "ens" = RMSE of the 5-init mean prediction (no selection).
+
+| frac | arm     | mean   | between | within | ens    |
+| ---- | ------- | ------ | ------- | ------ | ------ |
+| 0.01 | xgb     | 12.309 | 0.351   | 0.127  | 12.275 |
+| 0.01 | scratch | 11.856 | 0.332   | 0.665  | 11.600 |
+| 0.01 | pre     | 13.475 | 0.086   | 0.473  | 13.266 |
+| 0.05 | xgb     | 12.903 | 0.276   | 0.152  | 12.863 |
+| 0.05 | scratch | 12.967 | 0.096   | 0.660  | 12.769 |
+| 0.05 | pre     | 12.522 | 0.170   | 0.667  | 12.408 |
+| 0.10 | xgb     | 12.450 | 0.093   | 0.085  | 12.411 |
+| 0.10 | scratch | 13.377 | 0.119   | 0.800  | 13.223 |
+| 0.10 | pre     | 13.064 | 0.254   | 0.596  | 12.855 |
+
+Findings: (1) deep spread is **init-dominated** at every fraction (within 0.47–0.80
+vs between 0.09–0.33); XGB is the reverse (data-draw dominated, within ≤0.15). So the
+"seed" in the v1 curve was the model, not the split. (2) Same-subset init range for
+deep is 1–3.2 RMSE units (e.g. pre@5% subset 1: 10.79–14.01) — the "oracle seed beats
+XGB" statistic was init luck. (3) 5-init averaging recovers 0.1–0.26 RMSE, closes
+~1/3 of the init spread, and never beats the tree except scratch@1% (which single
+scratch already did; pre@1% is worse than scratch — full-finetune at lr 8e-4 on ~180
+rows, the v1 protocol defect). Turbine verdict unchanged (§3c locked); this is the
+variance-attribution evidence behind the "ensembling + recipe stabilization before
+any low-label claim" rule. Results: `logs/turbine_seed_decomp.{log,json}`.
+
+### 3g. Pretrained-ICL baselines + synthetic-prior spike (2026-09-16)
+
+**TabICLv2 (open, zero training) on the 51-table classification suite**
+(`scripts/icl_vs_trees.py`, same splits/trees as `tabular_vs_trees.py`): beats best tree
+on **36/51**, ties-or-beats 43/51, median edge +0.010 macro-F1, ~0.7 s/table. From-scratch
+TREA on the same tables: 12/51. Largest wins are exactly TREA's failures (balance_scale
+0.96 vs tree 0.71 vs TREA 0.23; vehicle +0.11; gesture +0.16). The field claim
+("pretrained ICL beats tuned GBDTs") **holds on our corpus** → the from-scratch ceiling
+was corpus/objective, not the tasks. Results: `logs/icl_vs_trees.json`.
+TabPFN (regression) is gated behind a license token (`TABPFN_TOKEN`); not run.
+
+**Synthetic-prior spike** (`scripts/synthetic_pretrain_spike.py`, pre-registered in the
+docstring): pretrain TREA's single-row encoder on TabICL's open SCM prior (1k/10k
+tables), few-shot (200 labels) on the 5 schema-scaling held-outs.
+- `sup` objective (predict synthetic y from x, no context rows): **loss pinned at 1.00 =
+  target variance for the entire run** — the encoder predicts the prior mean. Structural:
+  each synthetic table has its own random function; a row-at-a-time model cannot identify
+  it from one row, so the Bayes answer is the mean. This is exactly why TabPFN/TabICL need
+  in-context rows. (10k run also NaN-diverged; guarded, irrelevant to the conclusion.)
+- `mtm` objective (masked cells incl. target as a column): loss flat at 0.99 from step
+  250 to 1250, never below the mean-predictor floor. Finetune: beats scratch 3/5
+  (concrete −0.6, california −0.03, airfoil −0.2; worse on bike, tie abalone), all within
+  1–2 seed std. **Pre-registered verdict: KILL** for plain pretrain→finetune on synthetic
+  priors. Criterion (2) "beats real-corpus K=12 transfer_index" passed 5/5 but is
+  **vacuous**: `scratch_index` also beats that reference on 5/5 — the K=12 index-transfer
+  arm in §3b was itself worse than scratch-index, and scratch_index beats
+  scratch_semantic at 200 labels on 4/5 (untrained MiniLM projection hurts few-shot).
+- **Conclusion:** synthetic-prior scale cannot reach a row-independent encoder. The
+  in-context mechanism (rows attending to labeled rows of the same table) is the
+  load-bearing ingredient, not an inference-time add-on. Any GAUGE build must be ICL-first
+  (TabPFN/TabICL-style row attention) with TREA's column semantics + missingness + time
+  axis layered on, or it should fine-tune an open ICL model instead of training from
+  scratch. Results: `logs/synth_spike.json`, `logs/synth_spike_{sup,mtm}.log`.
+
+**3W binary well-disjoint, TabICL on the RF hand-stat features** (`scripts/three_w_icl.py`,
+3 seeds): cap 20k context rows → AUC **0.9415** / macro-F1 0.803 (88 s, 2.7 GB); cap 100k
+(seed 42 only) → AUC 0.9402 (744 s, 52 GB RSS) — more context does not help. **RF (200k
+rows) still wins: AUC 0.9584 / macro-F1 0.820.** So on the one industrial benchmark the
+pretrained-ICL model does NOT beat the tree; the ICL edge on the OpenML suite (36/51)
+does not carry to 3W hand stats on unseen wells. Consistent with §3d: the well-disjoint
+gap is a generalization-to-new-wells problem, not a model-class problem. Results:
+`logs/three_w_icl_cap20k.json`, `logs/three_w_icl_cap100k.log`.
+
+**Scope correction to §3g (2026-09-16, Kai's question):** the synthetic-prior KILL applies
+to the **single-row tabular encoder** (attends across columns of one row; no time axis,
+no cross-sample attention). It does NOT transfer to `TriplePatchTransformer` /
+`PatchTSTNan`: a time-series window is its own context, so a temporal synthetic prior
+with a forecasting (next-K rows) or masked-span objective IS identifiable from within
+the sample (Chronos/TimesFM absorb synthetic series this way with no cross-sample
+attention). Sensor-stream pretraining on temporal priors remains untested and live;
+cross-sample (in-context) attention would still be needed for *labels* (not visible
+inside a window), but not for the pretraining objective itself.
+
+### 3h. Updated small TREA + ensembles; real-NOx SSL is worth confirming (2026-09-16)
+
+The corrected nine-sensor NOx comparison with official reference implementations
+finds same-period RMSE TabM **4.539**, XGBoost **4.589**, FT-Transformer **4.636**,
+retuned TREA **4.765** (three initialization seeds, four validation presets per
+family). The selected TREA uses two layers, dropout 0, lr .0003, product+bias,
+and skips only the first attention-input norm. Averaging all three TREA predictions
+gives **4.519**, versus **4.566** for the equally ensembled tree. See
+`NOX_REFERENCE_MODELS.md`. Extra inference cost can close the remaining gap here.
+
+Follow-up with late-source validation and future-year testing, fixed nested label
+draws, three supervised seeds: scratch ensembles remain competitive even when
+XGBoost fits all labels including the neural validation rows. At 1/2/5/10/100%
+labels, scratch = **12.453/12.014/11.903/12.224/12.896**, all-label tree =
+**13.196/12.057/12.181/12.250/12.798**. Source-only masked pretraining improves
+the 1/2/5% ensembles to **11.895/11.692/11.492**, but worsens 10/full labels.
+Using unlabeled future features gives **11.270/11.516/11.682/12.583/12.228**;
+this is explicitly transductive. Both pretrained arms beat a matched untrained
+encoder probe/low-rate-finetuning control at 1/2/5%.
+
+These are updated-model diagnostics, **not an exact rerun or reversal of the old
+gate**: corrected feature/fit-row fairness, different optimization, one label draw,
+one SSL seed per arm, and a low-label adaptation-mode change. Seed variance remains
+large, and ensemble gains must not be presented as single-fit results. Freeze the
+recipe and replicate across label draws/SSL seeds before scaling pretraining.
+The real-sensor SSL finding does not rehabilitate the unrelated synthetic
+random-function prior. Full protocol, additional controls, baseline correction,
+and verified predictions: `NOX_TEMPORAL_PRETRAINING.md`.
+
+At Kai's request these settings are now the provisional single-row defaults:
+two layers, dropout 0, supervised lr .0003 (MTM lr remains .0008). Independent
+three-fit ensembling remains opt-in; the evidence does not isolate smaller depth
+from the other recipe changes. See `SMALL_MODEL_DEFAULTS.md` for compatibility
+and training-budget details. Compact experiment summaries are tracked in `results/`.

@@ -11,6 +11,10 @@ transfer_encoder    -- copy a pretrained encoder into a fresh regressor.
 build_trainer       -- Trainer with early-stopping + best-val checkpointing baked in
                        (we evaluate best-val weights, not last-epoch weights -- the
                        lesson from the variance diagnostic).
+
+Compact NOx defaults: two layers, no dropout, supervised lr=3e-4. MTM retains
+lr=8e-4, as tested. These are provisional across other datasets; three independent
+fits must be averaged explicitly to reproduce the reported ensemble results.
 """
 
 import os
@@ -170,9 +174,9 @@ class SingleRowRegressor(L.LightningModule):
         config,
         d_model=128,
         n_heads=4,
-        n_layers=4,
-        lr=8e-4,
-        dropout=0.2,
+        n_layers=2,
+        lr=3e-4,
+        dropout=0.0,
         col_embedder=None,
         column_descriptions=None,
         head: str = "mse",
@@ -184,10 +188,11 @@ class SingleRowRegressor(L.LightningModule):
         qk_norm: bool = True,
         pre_norm: bool = True,
         value_encoder: str = "identity",
-        fusion: str = "additive",
+        fusion: str = "product_sum",
         warmup_frac: float = 0.05,
         weight_decay: float = 3e-4,
         ensemble_k=0,
+        first_prenormalization: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
@@ -208,6 +213,7 @@ class SingleRowRegressor(L.LightningModule):
             output_dim=output_dim,
             value_encoder=value_encoder,
             fusion=fusion,
+            first_prenormalization=first_prenormalization,
             ensemble_k=ensemble_k,
         )
         if head == "hl_gauss":
@@ -288,9 +294,9 @@ class SingleRowClassifier(L.LightningModule):
         num_classes,
         d_model=128,
         n_heads=4,
-        n_layers=4,
-        lr=8e-4,
-        dropout=0.2,
+        n_layers=2,
+        lr=3e-4,
+        dropout=0.0,
         col_embedder=None,
         column_descriptions=None,
         class_priors=None,
@@ -299,10 +305,11 @@ class SingleRowClassifier(L.LightningModule):
         qk_norm: bool = True,
         pre_norm: bool = True,
         value_encoder: str = "identity",
-        fusion: str = "additive",
+        fusion: str = "product_sum",
         warmup_frac: float = 0.05,
         weight_decay: float = 3e-4,
         ensemble_k=0,
+        first_prenormalization: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
@@ -323,6 +330,7 @@ class SingleRowClassifier(L.LightningModule):
             pre_norm=pre_norm,
             value_encoder=value_encoder,
             fusion=fusion,
+            first_prenormalization=first_prenormalization,
             ensemble_k=ensemble_k,
         )
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
@@ -428,17 +436,18 @@ class SingleRowMTM(L.LightningModule):
         config,
         d_model=128,
         n_heads=4,
-        n_layers=4,
+        n_layers=2,
         lr=8e-4,
-        dropout=0.2,
+        dropout=0.0,
         col_embedder=None,
         column_descriptions=None,
         qk_norm: bool = True,
         pre_norm: bool = True,
         value_encoder: str = "identity",
-        fusion: str = "additive",
+        fusion: str = "product_sum",
         warmup_frac: float = 0.05,
         weight_decay: float = 3e-4,
+        first_prenormalization: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["config", "col_embedder"])
@@ -457,6 +466,7 @@ class SingleRowMTM(L.LightningModule):
             pre_norm=pre_norm,
             value_encoder=value_encoder,
             fusion=fusion,
+            first_prenormalization=first_prenormalization,
         )
         self.numeric_loss_fn = nn.MSELoss(reduction="none")
         self.categorical_loss_fn = nn.CrossEntropyLoss(reduction="none")

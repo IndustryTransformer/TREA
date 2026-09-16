@@ -160,4 +160,14 @@ torch = [{ index = "pytorch-cu128" }]
 torchvision = [{ index = "pytorch-cu128" }]
 
 [dependency-groups]
-dev = ["iniconfig>=2.1.0", "pygments>=2.19.2", "pytest>=8.4.1", "ruff>=0.12.3"]
+dev = [
+    "iniconfig>=2.1.0",
+    "pygments>=2.19.2",
+    "pytest>=8.4.1",
+    "rtdl-num-embeddings>=0.0.12",
+    "rtdl-revisiting-models>=0.0.2",
+    "ruff>=0.12.3",
+    "tabicl>=2.2.0",
+    "tabm>=0.0.3",
+    "tabpfn>=9.0.0",
+]
