@@ -30,6 +30,9 @@ PASS iff, on at least 4 of 5 held-outs, transfer_semantic has lower mean RMSE
 than ALL THREE of transfer_index, scratch_semantic and scratch_index.
 FAIL against scratch_index only -> the mechanism is real but has no user value at
 200 labels: do not ship the class as a feature; record the result and stop.
+Corpus = the §3b regression corpus (download_tabular_corpus.py entries only).
+(Clarified 2026-11-21 after a crash, before any complete run: the shared manifest
+had grown to 89 tables incl. classification; the pool was always meant to be §3b's.)
 
 Run (trains many small models; progress off):
     uv run python scripts/schema_scaling.py > /tmp/schema_gate.log 2>&1
@@ -74,12 +77,22 @@ GATED = ("transfer_index", "scratch_semantic", "scratch_index")
 
 
 def load_corpus():
+    """Load the §3b corpus: the regression sets from download_tabular_corpus.py.
+
+    data/tabular_corpus/manifest.json is shared with download_openml_suites.py,
+    which appends OpenML suite tables (classification included) carrying a "task"
+    key. Those were not in the §3b corpus, so they are excluded here; including
+    them put class labels into the regression source pool.
+    """
     manifest = json.loads((CORPUS / "manifest.json").read_text())
+    manifest = [m for m in manifest if "task" not in m]
     out = {}
     for m in manifest:
         df = pd.read_parquet(CORPUS / f"{m['name']}.parquet")
         feat = m["feature_cols"]
         df = df[feat + [TARGET]]
+        if not pd.api.types.is_numeric_dtype(df[TARGET]):
+            raise ValueError(f"{m['name']}: non-numeric target in regression corpus")
         tr, te = train_test_split(df, test_size=0.3, random_state=42)
         out[m["name"]] = {
             "train": tr.reset_index(drop=True),
