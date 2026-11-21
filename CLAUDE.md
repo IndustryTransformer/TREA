@@ -13,35 +13,63 @@ column embeddings) rather than preprocessing NaNs.
 This is a **consolidated** repo: it merges four archived prototypes (TREA-C, TREA-R,
 TabNCT, Hephaestus), seeded from TREA-C. The Python package is still named `trea/`.
 
-**The thesis (read before optimizing anything):** on fully-labeled benchmarks, trees
-(RF/XGBoost) beat deep models — on 3W, RF ≈ 0.92 macro-F1 vs ~0.81 for the best deep
-variant, at a fraction of the compute. Architecture tinkering has a low ceiling there.
-The defensible edge of a deep model is the regime trees structurally cannot touch:
-**(1) label efficiency** via self-supervised pretraining on abundant unlabeled sensor
-data, and **(2) cross-dataset transfer** via semantic column embeddings. TREA is
-optimized for the expensive-label / multi-dataset setting and benchmarked honestly with
-macro-F1 / balanced accuracy (never raw accuracy).
+**Status (read before optimizing anything): the supervised deep-vs-trees line is
+KILLED (July 2026).** Both pre-registered gates in `docs/LESSONS.md` §3 failed:
+
+- **Turbine NOx label efficiency (temporal split):** FAIL. The pretrained model beat the
+  best tree at 1 of 4 low-label fractions and lost to from-scratch at 1% (§3c, protocol v2).
+- **3W binary normal-vs-fault on unseen wells:** FAIL. RF beat deep on every metric:
+  AUC 0.958 vs 0.845, macro-F1 0.820 vs 0.669, at ~33× less compute (§3d).
+
+The kill clause fired (§3e). Do NOT open a v3 protocol, a new backbone variant, or a new
+benchmark to re-litigate head-to-head deep-vs-trees accuracy. That is the restart pattern
+the kill criterion exists to prevent.
+
+**What still stands:**
+
+- **Semantic column-name transfer.** Validated 5/5 on held-out datasets with unseen
+  columns (§3b). It is a cross-schema capability that trees and index embeddings lack. It
+  should ship on the simplest backbone that works, not necessarily a full transformer.
+  Caveats: the benefit saturates by K≈2–4 source schemas, and XGBoost is still the
+  absolute bar on 4 of 5 datasets.
+- **Native missing-value mask.** The [value, present]-flag encoding, with no imputation,
+  is architecture-agnostic and cheap to keep on any backbone.
+- **Real-NOx pretraining: pending replication.** Updated small-TREA ensembles with masked
+  pretraining beat the tree at 1/2/5% labels (§3h). This is one label draw and one SSL
+  seed per arm. It is not a reversal of the gate. Replicate across label draws and SSL
+  seeds before scaling pretraining.
+
+Open, not gated by §3: the GAUGE foundation-model design and temporal synthetic-prior
+pretraining for `TriplePatchTransformer` / `PatchTSTNan` (§3e, §3g). Each needs its own
+pre-registered gates before work starts. Benchmark with macro-F1 / balanced accuracy
+(classification) or RMSE (regression), never raw accuracy.
 
 ### Read first (orientation docs)
 
 - `docs/LESSONS.md` — empirical findings, **evaluation protocol, and pre-registered kill
   criterion**. Read before changing architecture or trusting any benchmark number.
-- `README.md` — the thesis and the one experiment that matters next (label-efficiency curve).
+- `README.md` — the original thesis, the kill verdict, and what survives it.
+- `docs/NOX_TEMPORAL_PRETRAINING.md` — the real-NOx pretraining result awaiting replication.
+- `docs/SMALL_MODEL_DEFAULTS.md` — current provisional single-row defaults.
 - `docs/CONSOLIDATION_PLAN.md` — why four repos became one; what to harvest.
 - `SEMANTIC_COLUMNS_SUMMARY.md` — column-identity findings and catalogued bug fixes.
 - `docs/trea_original_README.md` — inherited TREA-C API/usage reference.
 
 ## Current focus (immediate next tasks)
 
-Consolidation is mostly done (seeded from TREA-C). Active work, in order:
+The label-efficiency curve on 3W + turbine is done, and it triggered the kill (see
+Status above). Work that remains open after the verdict:
 
-1. **Harvest from the archived prototypes** (`docs/CONSOLIDATION_PLAN.md`): TabNCT's
-   first-class intra-row + inter-row attention and column-name-as-tokens; Hephaestus's
-   numeric projection only if it earns it in an ablation.
-2. **Port the bug fixes** in `SEMANTIC_COLUMNS_SUMMARY.md` (NaN-mask preservation,
-   class-weight null filter, macro-F1 reporting, the `batch·seq < 65536` attention limit).
-3. **Build the headline experiment**: the label-efficiency curve (macro-F1 vs # labels;
-   RF / from-scratch / pretrained) on 3W + a turbine dataset, on **well-disjoint** splits.
+1. **Replicate the real-NOx pretraining result** (`docs/LESSONS.md` §3h). Freeze the
+   recipe, then repeat across label draws and SSL seeds. Report single fits and
+   ensembles separately.
+2. **Ship semantic column-name transfer on a simple backbone** (§3b, §3e). Keep the
+   native missing-value mask.
+3. **Decide on GAUGE explicitly** (§3e, §3g). If pursued, it must be ICL-first and carry
+   its own pre-registered MVP gates. It does not inherit a pass from this line.
+
+Not in scope: new backbone variants, axial-attention work, or architecture harvests from
+the archived prototypes aimed at beating trees on single-benchmark accuracy.
 
 **Anti-thrash rule:** fix bugs in place — do NOT start a fifth repo. The four prototypes
 were archived precisely to stop that pattern.
@@ -253,6 +281,10 @@ implementation in `examples/train_3w.py`. Do not revive the older row-level parq
 loader: it built split-local label mappings and made validation invalid on
 well-disjoint splits.
 
+This multiclass setup and its 0.83 macro-F1 predate the kill verdict. It used a random
+per-file split, so the number is likely leaky. The adjudicated 3W benchmark is the
+binary well-disjoint gate (`examples/benchmark_3w_binary.py --split-mode well`).
+
 - Window: T=96, stride=96 (non-overlapping)
 - Architecture: d_model=256, n_head=8, num_layers=4, dropout=0.3
 - Loss: Plain CrossEntropyLoss (WeightedRandomSampler handles class balance)
@@ -271,8 +303,9 @@ well-disjoint splits.
 
 ### Evaluation protocol — fix before trusting any number (from `docs/LESSONS.md`)
 
-The eval is the underbuilt part; treat existing benchmark numbers (including RF's 0.92)
-as possibly optimistic until re-run under these rules:
+These rules governed the gates that killed the deep-vs-trees line, and they still apply
+to any new experiment. Treat older numbers from per-instance splits (including RF's 0.92
+multiclass macro-F1) as optimistic:
 
 - **Well-disjoint (grouped) splits.** 3W missingness is structural — whole sensor
   columns are absent per well, so the mask channel partly encodes well identity. The
@@ -281,10 +314,10 @@ as possibly optimistic until re-run under these rules:
 - **Per-instance, not per-window, metrics.** Windows from one instance are correlated;
   per-window scoring inflates effective N.
 - **Macro-F1 / balanced accuracy only.** Classes 0+4 are ~91% of windows; raw accuracy lies.
-- **Headline benchmark = label-efficiency curve** (macro-F1 vs # labels; lines for RF /
-  from-scratch / pretrained) on ≥2 datasets. The crossover point is the thesis.
-- A pre-registered **kill criterion** exists in `docs/LESSONS.md` §3 — consult it rather
-  than re-litigating whether the architecture "works."
+- **Pre-register before running.** The §3 kill criterion in `docs/LESSONS.md` has fired.
+  Any new line of work needs its own criterion, written down before results exist.
+- **Report shifted and i.i.d. results side by side.** On turbine NOx, deep won on a random
+  split and lost on the temporal split (§3c).
 - **Do not judge semantic columns on single-dataset accuracy** — their payoff is
   transfer; single-dataset underperformance is a known (likely embedding-scale) bug.
 
