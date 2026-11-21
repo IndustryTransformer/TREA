@@ -42,6 +42,11 @@ class TriplePatchTransformer(pl.LightningModule):
         use_semantic_columns: bool = False,
         column_descriptions: list[str] | None = None,
         semantic_bert_model: str = "bert-base-uncased",
+        stat_sensor_identity: bool = False,
+        stat_include_delta: bool = False,
+        direct_stat_pooling: bool = False,
+        stats_only: bool = False,
+        stat_exact_engineered: bool = False,
     ):
         """Initialize the Triple-Patch Transformer.
 
@@ -97,6 +102,27 @@ class TriplePatchTransformer(pl.LightningModule):
         self.use_semantic_columns = use_semantic_columns
         self.column_names = column_names
         self.C_num = C_num
+        self.stat_include_delta = stat_include_delta
+        self.direct_stat_pooling = direct_stat_pooling
+        self.stats_only = stats_only
+        self.stat_exact_engineered = stat_exact_engineered
+        if (
+            any(
+                (
+                    stat_sensor_identity,
+                    stat_include_delta,
+                    direct_stat_pooling,
+                    stats_only,
+                    stat_exact_engineered,
+                )
+            )
+            and not use_stat_tokens
+        ):
+            raise ValueError("Stat options require use_stat_tokens=True")
+        if direct_stat_pooling and stats_only:
+            raise ValueError("Choose direct_stat_pooling or stats_only")
+        if (direct_stat_pooling or stats_only) and pooling != "mean":
+            raise ValueError("Direct/stat-only pooling requires pooling='mean'")
 
         # Calculate number of patches
         self.num_patches = (T - patch_len) // stride + 1
@@ -185,8 +211,11 @@ class TriplePatchTransformer(pl.LightningModule):
         self.stat_token_proj = None
         self.stat_token_norm = None
         if use_stat_tokens:
-            self.stat_token_proj = nn.Linear(7, d_model)
+            self.stat_token_proj = nn.Linear(8 if stat_include_delta else 7, d_model)
             self.stat_token_norm = nn.LayerNorm(d_model)
+        self.stat_sensor_embedding = None
+        if stat_sensor_identity:
+            self.stat_sensor_embedding = nn.Embedding(C_num, d_model)
 
         # Optional wide semantic identity per feature: a frozen text encoding of
         # each column's description + a learned projection into d_model, added to
@@ -229,7 +258,7 @@ class TriplePatchTransformer(pl.LightningModule):
             # Type narrowing: we validated num_classes is not None above
             assert num_classes is not None
             self.head = nn.Sequential(
-                nn.Linear(d_model, d_model // 2),
+                nn.Linear(d_model * (2 if direct_stat_pooling else 1), d_model // 2),
                 nn.GELU(),
                 nn.Dropout(dropout),
                 nn.Linear(d_model // 2, num_classes),
@@ -237,7 +266,7 @@ class TriplePatchTransformer(pl.LightningModule):
             self.loss_fn = nn.CrossEntropyLoss()
         else:
             self.head = nn.Sequential(
-                nn.Linear(d_model, d_model // 2),
+                nn.Linear(d_model * (2 if direct_stat_pooling else 1), d_model // 2),
                 nn.GELU(),
                 nn.Dropout(dropout),
                 nn.Linear(d_model // 2, 1),
@@ -308,6 +337,10 @@ class TriplePatchTransformer(pl.LightningModule):
         centered = (x_val - mean.unsqueeze(-1)) * valid
         var = (centered * centered).sum(dim=2) / count
         std = torch.sqrt(var + 1e-6)
+        if self.stat_exact_engineered:
+            std = torch.where(
+                var > 0, torch.sqrt(var.clamp_min(1e-12)), torch.zeros_like(var)
+            )
         nan_rate = m_nan.mean(dim=2)
 
         half = x_val.shape[2] // 2
@@ -319,10 +352,17 @@ class TriplePatchTransformer(pl.LightningModule):
             mean_first = (x_val[:, :, :half] * valid_first).sum(dim=2) / count_first
             mean_second = (x_val[:, :, half:] * valid_second).sum(dim=2) / count_second
             slope = mean_second - mean_first
+            if self.stat_exact_engineered:
+                halves_valid = (valid_first.sum(dim=2) > 0) & (
+                    valid_second.sum(dim=2) > 0
+                )
+                slope = torch.where(halves_valid, slope, torch.zeros_like(slope))
         else:
             slope = torch.zeros_like(mean)
 
         energy = ((x_val * x_val) * valid).sum(dim=2) / count
+        if self.stat_exact_engineered:
+            energy = ((x_val * x_val) * valid).mean(dim=2)
 
         x_pos_inf = torch.full_like(x_val, float("inf"))
         x_neg_inf = torch.full_like(x_val, float("-inf"))
@@ -332,12 +372,15 @@ class TriplePatchTransformer(pl.LightningModule):
         min_v = torch.where(has_valid, min_v, torch.zeros_like(min_v))
         max_v = torch.where(has_valid, max_v, torch.zeros_like(max_v))
 
-        stats = torch.stack(
-            [mean, std, nan_rate, slope, energy, min_v, max_v],
-            dim=-1,
-        )
+        values = [mean, std, nan_rate, slope, energy, min_v, max_v]
+        if self.stat_include_delta:
+            values.append(x_val[:, :, -1] - x_val[:, :, 0])
+        stats = torch.stack(values, dim=-1)
         stat_tokens = self.stat_token_proj(stats)
-        return self.stat_token_norm(stat_tokens)
+        stat_tokens = self.stat_token_norm(stat_tokens)
+        if self.stat_sensor_embedding is not None:
+            stat_tokens = stat_tokens + self.stat_sensor_embedding.weight.unsqueeze(0)
+        return stat_tokens
 
     def forward(self, x_num: torch.Tensor, x_cat: torch.Tensor) -> torch.Tensor:
         """Forward pass with patch-based processing.
@@ -354,6 +397,10 @@ class TriplePatchTransformer(pl.LightningModule):
         # 1. Handle missing values: dual-patch encoding (value + mask)
         m_nan = torch.isnan(x_num).float()  # [B, C_num, T]
         x_val = torch.nan_to_num(x_num, nan=0.0)  # [B, C_num, T]
+        raw_values = x_val
+        if self.stats_only:
+            tokens = self.compute_stat_tokens(raw_values, m_nan)
+            return self.head(self.transformer(tokens).mean(dim=1))
 
         # 1b. Optional cross-feature attention before row/patch embedding
         if self.use_pre_patch_feature_attention:
@@ -412,7 +459,9 @@ class TriplePatchTransformer(pl.LightningModule):
         # active, each feature's token carries its stats plus its identity.
         feature_tokens = None
         if self.use_stat_tokens:
-            feature_tokens = self.compute_stat_tokens(x_val=x_val, m_nan=m_nan)
+            feature_tokens = self.compute_stat_tokens(
+                x_val=raw_values if self.stat_exact_engineered else x_val, m_nan=m_nan
+            )
         if self.use_semantic_columns:
             assert self.semantic_embedder is not None
             assert self.semantic_norm is not None
@@ -431,7 +480,15 @@ class TriplePatchTransformer(pl.LightningModule):
         z = self.transformer(z)
 
         # 9. Pooling
-        if self.pooling == "cls":
+        if self.direct_stat_pooling:
+            z = torch.cat(
+                [
+                    z[:, :patch_token_count].mean(dim=1),
+                    z[:, patch_token_count:].mean(dim=1),
+                ],
+                dim=-1,
+            )
+        elif self.pooling == "cls":
             z = z[:, 0, :]  # CLS token
         elif self.pooling == "mean":
             z = z[:, :patch_token_count, :].mean(dim=1)

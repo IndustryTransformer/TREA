@@ -1,0 +1,639 @@
+{
+  "ABER-CKGL": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 44153738,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      53.0,
+      87.48155399999365,
+      100.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      53.0,
+      100.0
+    ],
+    "common_extremes": []
+  },
+  "ABER-CKP": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 42110601,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      28.4651,
+      100.0,
+      100.0,
+      100.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      28.4651,
+      100.0,
+      100.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-DHSV": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 41583867,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-M1": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 38200122,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-M2": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 38298860,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-PXO": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 38051459,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-SDV-GL": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 36937551,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-SDV-P": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 33624950,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-W1": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 38051496,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-W2": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 38296305,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "ESTADO-XO": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 38051455,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "common_extremes": []
+  },
+  "P-ANULAR": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 31515334,
+      "above_legacy_clip": 15711792,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -6619700.0,
+      -3626928.137,
+      715813.572,
+      16495110.0,
+      25248110.0,
+      26090847.19999999,
+      27204440.0
+    ],
+    "excluding_extreme_quantiles": [
+      -6619700.0,
+      715813.572,
+      16495110.0,
+      25248110.0,
+      27204440.0
+    ],
+    "common_extremes": []
+  },
+  "P-JUS-BS": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 47625808
+    },
+    "sample_quantiles": [],
+    "excluding_extreme_quantiles": [],
+    "common_extremes": []
+  },
+  "P-JUS-CKGL": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 28384588,
+      "above_legacy_clip": 16220062,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -497671.7,
+      -497671.7,
+      -497671.7,
+      12883140.0,
+      44999980.0,
+      45009626.7570006,
+      10520300499.9936
+    ],
+    "excluding_extreme_quantiles": [
+      -497671.7,
+      -497671.7,
+      12883140.0,
+      44999980.0,
+      10520300499.9936
+    ],
+    "common_extremes": []
+  },
+  "P-JUS-CKP": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 34794619,
+      "above_legacy_clip": 12318553,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -57348.83,
+      90793.41320000001,
+      1000535.538599982,
+      1118146.0,
+      10038770.0,
+      10048058.57,
+      10051770.0
+    ],
+    "excluding_extreme_quantiles": [
+      -57348.83,
+      1000535.538599982,
+      1118146.0,
+      10038770.0,
+      10051770.0
+    ],
+    "common_extremes": []
+  },
+  "P-MON-CKGL": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 47478620,
+      "above_legacy_clip": 135273,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      86770.49,
+      94041.76961,
+      158779.269,
+      17043990.0,
+      18065761.4,
+      18348534.169999998,
+      18371800.0
+    ],
+    "excluding_extreme_quantiles": [
+      86770.49,
+      158779.269,
+      17043990.0,
+      18065761.4,
+      18371800.0
+    ],
+    "common_extremes": []
+  },
+  "P-MON-CKP": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 7063082,
+      "above_legacy_clip": 37356721,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -98557.15,
+      10.93188,
+      122.68001223392922,
+      2500381.5,
+      12293360.0,
+      12785254.309999987,
+      20218670.0
+    ],
+    "excluding_extreme_quantiles": [
+      -98557.15,
+      122.68001223392922,
+      2500381.5,
+      12293360.0,
+      20218670.0
+    ],
+    "common_extremes": []
+  },
+  "P-MON-SDV-P": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 47625808
+    },
+    "sample_quantiles": [],
+    "excluding_extreme_quantiles": [],
+    "common_extremes": []
+  },
+  "P-PDG": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 6417956,
+      "above_legacy_clip": 30947538,
+      "above_1e12": 305679
+    },
+    "sample_quantiles": [
+      -1.180116e+42,
+      -1.180116e+42,
+      0.0,
+      20859234.88889028,
+      44858050.0,
+      44858050.0,
+      49094250.0
+    ],
+    "excluding_extreme_quantiles": [
+      -6887865.0,
+      0.0,
+      20865073.30000128,
+      44858050.0,
+      49094250.0
+    ],
+    "common_extremes": [
+      [
+        -1.180116e+42,
+        305679
+      ]
+    ]
+  },
+  "PT-P": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 47625808
+    },
+    "sample_quantiles": [],
+    "excluding_extreme_quantiles": [],
+    "common_extremes": []
+  },
+  "P-TPT": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 2950212,
+      "above_legacy_clip": 43273091,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -17129300.0,
+      -8600432.0,
+      0.0,
+      16131871.0,
+      28147780.92500096,
+      81709770.0,
+      2941990000.0
+    ],
+    "excluding_extreme_quantiles": [
+      -17129300.0,
+      0.0,
+      16131871.0,
+      28147780.92500096,
+      2941990000.0
+    ],
+    "common_extremes": []
+  },
+  "QBS": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 47625808
+    },
+    "sample_quantiles": [],
+    "excluding_extreme_quantiles": [],
+    "common_extremes": []
+  },
+  "QGL": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 32098399,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -46.80180951380992,
+      -0.027990014862362692,
+      -0.0005683673672155302,
+      0.00495798389001088,
+      5.790771,
+      7.293639650470114,
+      7.297283
+    ],
+    "excluding_extreme_quantiles": [
+      -46.80180951380992,
+      -0.0005683673672155302,
+      0.00495798389001088,
+      5.790771,
+      7.297283
+    ],
+    "common_extremes": []
+  },
+  "T-JUS-CKP": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 12329788,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -11.39278,
+      -10.15767915,
+      25.12973562000077,
+      75.89948568614064,
+      105.72051974672682,
+      109.912,
+      110.0865
+    ],
+    "excluding_extreme_quantiles": [
+      -11.39278,
+      25.12973562000077,
+      75.89948568614064,
+      105.72051974672682,
+      110.0865
+    ],
+    "common_extremes": []
+  },
+  "T-MON-CKP": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 33789701,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -1.194096,
+      9.818253594,
+      24.15285,
+      86.61943495184691,
+      107.71484392306625,
+      110.13506640000001,
+      110.2682
+    ],
+    "excluding_extreme_quantiles": [
+      -1.194096,
+      24.15285,
+      86.61943495184691,
+      107.71484392306625,
+      110.2682
+    ],
+    "common_extremes": []
+  },
+  "T-PDG": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 36958269,
+      "above_legacy_clip": 872003,
+      "above_1e12": 872003
+    },
+    "sample_quantiles": [
+      -1.711613e+38,
+      -1.711613e+38,
+      -1.711613e+38,
+      36.23471,
+      30000.0,
+      30000.0,
+      30000.0
+    ],
+    "excluding_extreme_quantiles": [
+      0.0,
+      0.0,
+      36.23471,
+      30000.0,
+      30000.0
+    ],
+    "common_extremes": [
+      [
+        -1.413714e+20,
+        311593
+      ],
+      [
+        -1.711613e+38,
+        305679
+      ],
+      [
+        -2901665000000000.0,
+        254722
+      ],
+      [
+        -1.272342e+20,
+        1
+      ],
+      [
+        -1.130971e+20,
+        1
+      ]
+    ]
+  },
+  "T-TPT": {
+    "counts": {
+      "total": 47625808,
+      "missing_or_nonfinite": 6248569,
+      "above_legacy_clip": 0,
+      "above_1e12": 0
+    },
+    "sample_quantiles": [
+      -33.75,
+      -33.75,
+      3.1722421174419533,
+      117.0417,
+      126.3860743381279,
+      127.439,
+      127.7401
+    ],
+    "excluding_extreme_quantiles": [
+      -33.75,
+      3.1722421174419533,
+      117.0417,
+      126.3860743381279,
+      127.7401
+    ],
+    "common_extremes": []
+  }
+}

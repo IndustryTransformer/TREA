@@ -1,0 +1,681 @@
+{
+  "scope": "Repeated internal validation only, not independent confirmation.",
+  "plan": {
+    "scope": "Development only; no consumed held-out evaluation.",
+    "hypothesis": "Physical training AUC is high and physical data already dominates weighted loss. Test regularization, not more group emphasis.",
+    "contrast": "AdamW decay 0.0003 -> 0.03; no other recipe change.",
+    "selection": "Existing internal-validation AUC early stopping unchanged.",
+    "reporting": "All seeds 42/43/44 and explicit probability ensembles.",
+    "expansion": "No automatic decay grid, outer refit, or success claim.",
+    "reference": "https://arxiv.org/abs/1911.08731"
+  },
+  "checks": "Recipes, sampled rows, probability ensembles and metrics verified.",
+  "runs": {
+    "single_row/baseline": {
+      "model": "single_row",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "single_fit_auc": {
+        "values": [
+          0.9366216815992585,
+          0.9045682564863149,
+          0.896992564747698
+        ],
+        "mean": 0.9127275009444237,
+        "population_std": 0.01717646991679889
+      },
+      "single_fit_macro_f1": {
+        "values": [
+          0.8291297470769534,
+          0.7639436310014378,
+          0.810616633094425
+        ],
+        "mean": 0.801230003724272,
+        "population_std": 0.02742734694244793
+      },
+      "ensemble": {
+        "auc": 0.9236300755264382,
+        "accuracy": 0.8743543328875155,
+        "anomaly_precision": 0.9515122565187393,
+        "anomaly_recall": 0.8906979715246923,
+        "anomaly_f1": 0.920101325962395,
+        "normal_f1": 0.7060489581225977,
+        "macro_f1": 0.8130751420424964,
+        "tp": 125494,
+        "fp": 6395,
+        "fn": 15400,
+        "tn": 26175,
+        "macro_f1_at_05": 0.7639756042067235,
+        "threshold_from_validation": 0.6504935622215271,
+        "instance_majority": {
+          "auc": 0.7593036109064113,
+          "accuracy": 0.6903114186851211,
+          "anomaly_precision": 0.9828178694158075,
+          "anomaly_recall": 0.6217391304347826,
+          "anomaly_f1": 0.7616511318242344,
+          "normal_f1": 0.5580246913580247,
+          "macro_f1": 0.6598379115911295,
+          "tp": 286,
+          "fp": 5,
+          "fn": 174,
+          "tn": 113
+        }
+      },
+      "source_ensemble": {
+        "physical": {
+          "auc": 0.7742655960341954,
+          "accuracy": 0.7346790005530139,
+          "anomaly_precision": 0.8564833581047606,
+          "anomaly_recall": 0.7207314762175479,
+          "anomaly_f1": 0.782765291841607,
+          "normal_f1": 0.6592523243801652,
+          "macro_f1": 0.7210088081108861,
+          "tp": 38033,
+          "fp": 6373,
+          "fn": 14737,
+          "tn": 20421,
+          "macro_f1_at_05": 0.6565709469192107,
+          "threshold_from_validation": 0.6504935622215271,
+          "instance_majority": {
+            "auc": 0.5347884916678536,
+            "accuracy": 0.49719101123595505,
+            "anomaly_precision": 0.927536231884058,
+            "anomaly_recall": 0.2689075630252101,
+            "anomaly_f1": 0.41693811074918563,
+            "normal_f1": 0.5580246913580247,
+            "macro_f1": 0.48748140105360516,
+            "tp": 64,
+            "fp": 5,
+            "fn": 174,
+            "tn": 113
+          }
+        },
+        "simulation": {
+          "auc": 0.9995793512314742,
+          "accuracy": 0.9927050053248136,
+          "anomaly_precision": 0.9997485225700994,
+          "anomaly_recall": 0.9924765103717489,
+          "anomaly_f1": 0.9960992443353626,
+          "normal_f1": 0.9438202247191011,
+          "macro_f1": 0.9699597345272318,
+          "tp": 87461,
+          "fp": 22,
+          "fn": 663,
+          "tn": 5754,
+          "macro_f1_at_05": 0.9768449854413122,
+          "threshold_from_validation": 0.6504935622215271,
+          "instance_majority": {
+            "auc": null,
+            "accuracy": 1.0,
+            "anomaly_precision": 1.0,
+            "anomaly_recall": 1.0,
+            "anomaly_f1": 1.0,
+            "normal_f1": 0.0,
+            "macro_f1": 0.5,
+            "tp": 222,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0
+          }
+        }
+      },
+      "physical_wells": [
+        {
+          "group": "WELL-00001",
+          "windows": 21638,
+          "auc": 0.6607392492013364
+        },
+        {
+          "group": "WELL-00004",
+          "windows": 4180,
+          "auc": 0.6602398589272325
+        },
+        {
+          "group": "WELL-00007",
+          "windows": 897,
+          "auc": 0.509665327978581
+        },
+        {
+          "group": "WELL-00010",
+          "windows": 8435,
+          "auc": 0.5697300558804984
+        },
+        {
+          "group": "WELL-00013",
+          "windows": 106,
+          "auc": 1.0
+        },
+        {
+          "group": "WELL-00014",
+          "windows": 8543,
+          "auc": 0.7811791100585815
+        },
+        {
+          "group": "WELL-00022",
+          "windows": 32026,
+          "auc": 0.8224139123763872
+        },
+        {
+          "group": "WELL-00031",
+          "windows": 3739,
+          "auc": 1.0
+        }
+      ]
+    },
+    "single_row/stronger_decay": {
+      "model": "single_row",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "single_fit_auc": {
+        "values": [
+          0.9399810629198532,
+          0.9289028664576713,
+          0.8934122801351337
+        ],
+        "mean": 0.9207654031708862,
+        "population_std": 0.019863309795876218
+      },
+      "single_fit_macro_f1": {
+        "values": [
+          0.8331486293712194,
+          0.810001458493997,
+          0.7749291263325642
+        ],
+        "mean": 0.8060264047325935,
+        "population_std": 0.023933636341928646
+      },
+      "ensemble": {
+        "auc": 0.9274846352764522,
+        "accuracy": 0.8781188027486971,
+        "anomaly_precision": 0.9536747992120018,
+        "anomaly_recall": 0.8933382542904595,
+        "anomaly_f1": 0.9225210170261733,
+        "normal_f1": 0.7145056310260081,
+        "macro_f1": 0.8185133240260907,
+        "tp": 125866,
+        "fp": 6114,
+        "fn": 15028,
+        "tn": 26456,
+        "macro_f1_at_05": 0.7824787858553808,
+        "threshold_from_validation": 0.730069637298584,
+        "instance_majority": {
+          "auc": 0.7715917464996316,
+          "accuracy": 0.7076124567474048,
+          "anomaly_precision": 0.9619047619047619,
+          "anomaly_recall": 0.658695652173913,
+          "anomaly_f1": 0.7819354838709678,
+          "normal_f1": 0.5564304461942258,
+          "macro_f1": 0.6691829650325968,
+          "tp": 303,
+          "fp": 12,
+          "fn": 157,
+          "tn": 106
+        }
+      },
+      "source_ensemble": {
+        "physical": {
+          "auc": 0.7825073318536733,
+          "accuracy": 0.746556231461465,
+          "anomaly_precision": 0.8637245933825662,
+          "anomaly_recall": 0.7336175857494789,
+          "anomaly_f1": 0.7933723396624689,
+          "normal_f1": 0.6723109673854754,
+          "macro_f1": 0.7328416535239721,
+          "tp": 38713,
+          "fp": 6108,
+          "fn": 14057,
+          "tn": 20686,
+          "macro_f1_at_05": 0.683892836440978,
+          "threshold_from_validation": 0.730069637298584,
+          "instance_majority": {
+            "auc": 0.5667639937330864,
+            "accuracy": 0.5252808988764045,
+            "anomaly_precision": 0.8709677419354839,
+            "anomaly_recall": 0.3403361344537815,
+            "anomaly_f1": 0.48942598187311176,
+            "normal_f1": 0.5564304461942258,
+            "macro_f1": 0.5229282140336687,
+            "tp": 81,
+            "fp": 12,
+            "fn": 157,
+            "tn": 106
+          }
+        },
+        "simulation": {
+          "auc": 0.9996097203311225,
+          "accuracy": 0.9895953141640043,
+          "anomaly_precision": 0.9999311602932571,
+          "anomaly_recall": 0.9889814352503291,
+          "anomaly_f1": 0.9944261565582515,
+          "normal_f1": 0.9219461532316049,
+          "macro_f1": 0.9581861548949282,
+          "tp": 87153,
+          "fp": 6,
+          "fn": 971,
+          "tn": 5770,
+          "macro_f1_at_05": 0.9773215812013619,
+          "threshold_from_validation": 0.730069637298584,
+          "instance_majority": {
+            "auc": null,
+            "accuracy": 1.0,
+            "anomaly_precision": 1.0,
+            "anomaly_recall": 1.0,
+            "anomaly_f1": 1.0,
+            "normal_f1": 0.0,
+            "macro_f1": 0.5,
+            "tp": 222,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0
+          }
+        }
+      },
+      "physical_wells": [
+        {
+          "group": "WELL-00001",
+          "windows": 21638,
+          "auc": 0.7172536677302529
+        },
+        {
+          "group": "WELL-00004",
+          "windows": 4180,
+          "auc": 0.5945328758317654
+        },
+        {
+          "group": "WELL-00007",
+          "windows": 897,
+          "auc": 0.8208567603748327
+        },
+        {
+          "group": "WELL-00010",
+          "windows": 8435,
+          "auc": 0.5387182637182637
+        },
+        {
+          "group": "WELL-00013",
+          "windows": 106,
+          "auc": 1.0
+        },
+        {
+          "group": "WELL-00014",
+          "windows": 8543,
+          "auc": 0.7441121199627991
+        },
+        {
+          "group": "WELL-00022",
+          "windows": 32026,
+          "auc": 0.7743944014228791
+        },
+        {
+          "group": "WELL-00031",
+          "windows": 3739,
+          "auc": 0.9999936158531136
+        }
+      ]
+    },
+    "tabm_ple/baseline": {
+      "model": "tabm_ple",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "single_fit_auc": {
+        "values": [
+          0.9368289282938048,
+          0.9362127261174301,
+          0.9465503658054368
+        ],
+        "mean": 0.9398640067388907,
+        "population_std": 0.0047346576402545444
+      },
+      "single_fit_macro_f1": {
+        "values": [
+          0.8286954350221187,
+          0.8282300229704043,
+          0.8358189833589531
+        ],
+        "mean": 0.8309148137838255,
+        "population_std": 0.003472972934982044
+      },
+      "ensemble": {
+        "auc": 0.9429500358339407,
+        "accuracy": 0.8962320712078586,
+        "anomaly_precision": 0.9489245740670388,
+        "anomaly_recall": 0.9218632447087882,
+        "anomaly_f1": 0.9351981855491954,
+        "normal_f1": 0.7397264235518667,
+        "macro_f1": 0.8374623045505311,
+        "tp": 129885,
+        "fp": 6991,
+        "fn": 11009,
+        "tn": 25579,
+        "macro_f1_at_05": 0.8305499627375511,
+        "threshold_from_validation": 0.5671513676643372,
+        "instance_majority": {
+          "auc": 0.895725865880619,
+          "accuracy": 0.8131487889273357,
+          "anomaly_precision": 0.9808743169398907,
+          "anomaly_recall": 0.7804347826086957,
+          "anomaly_f1": 0.8692493946731233,
+          "normal_f1": 0.6727272727272727,
+          "macro_f1": 0.770988333700198,
+          "tp": 359,
+          "fp": 7,
+          "fn": 101,
+          "tn": 111
+        }
+      },
+      "source_ensemble": {
+        "physical": {
+          "auc": 0.823197152867372,
+          "accuracy": 0.7768211754059625,
+          "anomaly_precision": 0.8575308894108037,
+          "anomaly_recall": 0.7956983134356642,
+          "anomaly_f1": 0.8254582985206664,
+          "normal_f1": 0.6906068684334327,
+          "macro_f1": 0.7580325834770496,
+          "tp": 41989,
+          "fp": 6976,
+          "fn": 10781,
+          "tn": 19818,
+          "macro_f1_at_05": 0.7501749755827543,
+          "threshold_from_validation": 0.5671513676643372,
+          "instance_majority": {
+            "auc": 0.7994943740207947,
+            "accuracy": 0.6966292134831461,
+            "anomaly_precision": 0.9513888888888888,
+            "anomaly_recall": 0.5756302521008403,
+            "anomaly_f1": 0.7172774869109947,
+            "normal_f1": 0.6727272727272727,
+            "macro_f1": 0.6950023798191337,
+            "tp": 137,
+            "fp": 7,
+            "fn": 101,
+            "tn": 111
+          }
+        },
+        "simulation": {
+          "auc": 0.9998834646213074,
+          "accuracy": 0.9974121405750799,
+          "anomaly_precision": 0.9998293728884895,
+          "anomaly_recall": 0.9974127365984294,
+          "anomaly_f1": 0.9986195926946345,
+          "normal_f1": 0.9793455163620909,
+          "macro_f1": 0.9889825545283627,
+          "tp": 87896,
+          "fp": 15,
+          "fn": 228,
+          "tn": 5761,
+          "macro_f1_at_05": 0.9913830120903108,
+          "threshold_from_validation": 0.5671513676643372,
+          "instance_majority": {
+            "auc": null,
+            "accuracy": 1.0,
+            "anomaly_precision": 1.0,
+            "anomaly_recall": 1.0,
+            "anomaly_f1": 1.0,
+            "normal_f1": 0.0,
+            "macro_f1": 0.5,
+            "tp": 222,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0
+          }
+        }
+      },
+      "physical_wells": [
+        {
+          "group": "WELL-00001",
+          "windows": 21638,
+          "auc": 0.7812913027291429
+        },
+        {
+          "group": "WELL-00004",
+          "windows": 4180,
+          "auc": 0.7098220968560954
+        },
+        {
+          "group": "WELL-00007",
+          "windows": 897,
+          "auc": 0.9618741633199466
+        },
+        {
+          "group": "WELL-00010",
+          "windows": 8435,
+          "auc": 0.5451564074130446
+        },
+        {
+          "group": "WELL-00013",
+          "windows": 106,
+          "auc": 1.0
+        },
+        {
+          "group": "WELL-00014",
+          "windows": 8543,
+          "auc": 0.8047620303166856
+        },
+        {
+          "group": "WELL-00022",
+          "windows": 32026,
+          "auc": 0.7807098584589219
+        },
+        {
+          "group": "WELL-00031",
+          "windows": 3739,
+          "auc": 1.0
+        }
+      ]
+    },
+    "tabm_ple/stronger_decay": {
+      "model": "tabm_ple",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "single_fit_auc": {
+        "values": [
+          0.9349689087246584,
+          0.9401360319267272,
+          0.9458473372712002
+        ],
+        "mean": 0.9403174259741952,
+        "population_std": 0.004442951703608481
+      },
+      "single_fit_macro_f1": {
+        "values": [
+          0.8284304503582154,
+          0.8332974906220232,
+          0.8368417724611225
+        ],
+        "mean": 0.8328565711471203,
+        "population_std": 0.003448032517946499
+      },
+      "ensemble": {
+        "auc": 0.9433333062826551,
+        "accuracy": 0.8951021537610109,
+        "anomaly_precision": 0.9516668139117118,
+        "anomaly_recall": 0.9174485783638764,
+        "anomaly_f1": 0.9342444764059236,
+        "normal_f1": 0.7408198729453324,
+        "macro_f1": 0.8375321746756279,
+        "tp": 129263,
+        "fp": 6565,
+        "fn": 11631,
+        "tn": 26005,
+        "macro_f1_at_05": 0.8315597228803758,
+        "threshold_from_validation": 0.5838630199432373,
+        "instance_majority": {
+          "auc": 0.896057479734709,
+          "accuracy": 0.8079584775086506,
+          "anomaly_precision": 0.9833795013850416,
+          "anomaly_recall": 0.7717391304347826,
+          "anomaly_f1": 0.8647990255785628,
+          "normal_f1": 0.6686567164179104,
+          "macro_f1": 0.7667278709982366,
+          "tp": 355,
+          "fp": 6,
+          "fn": 105,
+          "tn": 112
+        }
+      },
+      "source_ensemble": {
+        "physical": {
+          "auc": 0.8247040602131078,
+          "accuracy": 0.7747725101804837,
+          "anomaly_precision": 0.863369062017767,
+          "anomaly_recall": 0.7845745688838355,
+          "anomaly_f1": 0.8220880822842619,
+          "normal_f1": 0.6931717005684542,
+          "macro_f1": 0.7576298914263581,
+          "tp": 41402,
+          "fp": 6552,
+          "fn": 11368,
+          "tn": 20242,
+          "macro_f1_at_05": 0.7515400459287238,
+          "threshold_from_validation": 0.5838630199432373,
+          "instance_majority": {
+            "auc": 0.8001709158239566,
+            "accuracy": 0.6882022471910112,
+            "anomaly_precision": 0.9568345323741008,
+            "anomaly_recall": 0.5588235294117647,
+            "anomaly_f1": 0.7055702917771884,
+            "normal_f1": 0.6686567164179104,
+            "macro_f1": 0.6871135040975493,
+            "tp": 133,
+            "fp": 6,
+            "fn": 105,
+            "tn": 112
+          }
+        },
+        "simulation": {
+          "auc": 0.9998795589562731,
+          "accuracy": 0.9970607028753994,
+          "anomaly_precision": 0.9998520609053873,
+          "anomaly_recall": 0.9970155689709954,
+          "anomaly_f1": 0.9984318003613678,
+          "normal_f1": 0.9766141331977631,
+          "macro_f1": 0.9875229667795655,
+          "tp": 87861,
+          "fp": 13,
+          "fn": 263,
+          "tn": 5763,
+          "macro_f1_at_05": 0.9913816360966818,
+          "threshold_from_validation": 0.5838630199432373,
+          "instance_majority": {
+            "auc": null,
+            "accuracy": 1.0,
+            "anomaly_precision": 1.0,
+            "anomaly_recall": 1.0,
+            "anomaly_f1": 1.0,
+            "normal_f1": 0.0,
+            "macro_f1": 0.5,
+            "tp": 222,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0
+          }
+        }
+      },
+      "physical_wells": [
+        {
+          "group": "WELL-00001",
+          "windows": 21638,
+          "auc": 0.7895764463943657
+        },
+        {
+          "group": "WELL-00004",
+          "windows": 4180,
+          "auc": 0.7060917697007292
+        },
+        {
+          "group": "WELL-00007",
+          "windows": 897,
+          "auc": 0.9645247657295849
+        },
+        {
+          "group": "WELL-00010",
+          "windows": 8435,
+          "auc": 0.5391903488363665
+        },
+        {
+          "group": "WELL-00013",
+          "windows": 106,
+          "auc": 1.0
+        },
+        {
+          "group": "WELL-00014",
+          "windows": 8543,
+          "auc": 0.7967986270242284
+        },
+        {
+          "group": "WELL-00022",
+          "windows": 32026,
+          "auc": 0.788965858017217
+        },
+        {
+          "group": "WELL-00031",
+          "windows": 3739,
+          "auc": 0.9999957439020757
+        }
+      ]
+    }
+  },
+  "comparisons": {
+    "single_row": {
+      "ensemble_auc_delta": 0.0038545597500140305,
+      "ensemble_macro_f1_delta": 0.005438181983594248,
+      "single_fit_auc_mean_delta": 0.008037902226462501
+    },
+    "tabm_ple": {
+      "ensemble_auc_delta": 0.0003832704487144456,
+      "ensemble_macro_f1_delta": 6.98701250968492e-05,
+      "single_fit_auc_mean_delta": 0.00045341923530450856
+    }
+  },
+  "artifact_sha256": {
+    "/home/kailukowiak/Work/TREA/examples/benchmark_3w_regularization.py": "6ba2fa40e5c97d7458cd234ea901e49eee75452b72dfe4e34ce13ebf85e4a778",
+    "logs/benchmark_3w_binary/causal_context_trea/config.json": "1bbf0b65a31fc01bcced93c7fe2c2ba99a83afbc6123244e15b7973c9ab9fee3",
+    "logs/benchmark_3w_binary/training_group_audit_v1/results.json": "5dc95a8e35409d9a7772d05b98f84652028cb593db6f3d075d6f0814521b39f5",
+    "docs/results/3w_range_confirmation_protocol.json": "2060da4a5cadfd2c0091d58c05f08e0e48a9372ad63b0c56dc9fe9141445eac4",
+    "examples/benchmark_3w_context.py": "8107766b59e1c8320de81760a9bdc226757376c3a882bfb0018df6e8526851cb",
+    "examples/benchmark_3w_grouped.py": "a32b336b7dc36f05e89ee7c09ffe28401e67b841cfcb97098c9844fc113016a1",
+    "examples/three_w_causal_features.py": "e102728ca14fbe475c1eb02ad6fcaaf9e032c24c7e8fa570b503bc5a0e96e8bd",
+    "trea/models/single_row.py": "048821d9f3c627c58eb728fe29271ccacaefcc69f5380f18178c97a3bb1f7d9a",
+    "utils/three_w.py": "7f4d6fb7f1b122f71bed62ac7f26f66ef2f9049b0088c63ac686b2475b3880f5",
+    "logs/benchmark_3w_binary/causal_context_trea/results.json": "d5e4fbcccac8df12ae4d61b89026df17a06caf7f459612fb9fc08509bd430a5f",
+    "logs/benchmark_3w_binary/causal_context_trea/single_row_42_predictions.npz": "d3f11b0d0095512ad06442f68fa639647c693bfb07c05329c369e6bee59a6508",
+    "logs/benchmark_3w_binary/causal_context_trea/single_row_43_predictions.npz": "1e10f6c247eda5506187213cfd847f98bacab1cb6c0d5e188c81b7a82a6a619a",
+    "logs/benchmark_3w_binary/causal_context_trea/single_row_44_predictions.npz": "43a48699af27c6880fd10c710ded5c4e7b7d92a97a8946c9f38c6a1484f0cd98",
+    "logs/benchmark_3w_binary/causal_context_trea/single_row_ensemble_predictions.npz": "eeb07e99ac90f1040d7ad662903eea8391691f4978df089590248e08f6a0f8da",
+    "logs/benchmark_3w_binary/causal_regularization_v1/config.json": "fa78c58022e7e5c710fa0e44a635b834348f8ef076308b3c20eb5f1705a2808b",
+    "logs/benchmark_3w_binary/causal_regularization_v1/results.json": "3f00c5d3447e0f985d671848146ed422816b1331ffe383bf82de522974329c32",
+    "logs/benchmark_3w_binary/causal_regularization_v1/single_row_42_predictions.npz": "fc07bd8d4648b9d3ceaa43f33352ceb29a4ad32a9bf52f88ea99bec94f9c1740",
+    "logs/benchmark_3w_binary/causal_regularization_v1/single_row_43_predictions.npz": "cdbe10f2621c97abd970da7987f675e57a197a874d28be1f2046d53f0f8eb770",
+    "logs/benchmark_3w_binary/causal_regularization_v1/single_row_44_predictions.npz": "41a00781bbec3be4f7bafa120ece91ee2bc385588490cc8560519be34b6501e3",
+    "logs/benchmark_3w_binary/causal_regularization_v1/single_row_ensemble_predictions.npz": "144dae2ee0b87b1613d2fe7f6ba2b5a5a1ab2a42c65a2b28a12ce6f698250573",
+    "logs/benchmark_3w_binary/causal_context_trees_tabm/config.json": "f79130a9d8e198f62f9146b587bdda36303731d0e2570fc26bcdd6ac1f48ebf5",
+    "logs/benchmark_3w_binary/causal_context_trees_tabm/results.json": "8d76174066186373d36b054bdf03cd1345fb7fea91d80f0a66b27c46ce24d958",
+    "logs/benchmark_3w_binary/causal_context_trees_tabm/tabm_ple_42_predictions.npz": "318f77d348c325824fda05a55e0021efd04298bb62135445870dd561fb729f82",
+    "logs/benchmark_3w_binary/causal_context_trees_tabm/tabm_ple_43_predictions.npz": "94697863d27d7d27619096d659221af41e4a938763dd7f8d25e52d3bcbdf2588",
+    "logs/benchmark_3w_binary/causal_context_trees_tabm/tabm_ple_44_predictions.npz": "4e99fce8fdd759f17f25e004daacdbbd790805452bbcbf10b7dacda4cbfc6a11",
+    "logs/benchmark_3w_binary/causal_context_trees_tabm/tabm_ple_ensemble_predictions.npz": "6bab29e81c3212386a3a83ec0bd16ce575e281f11111df59e65897af5fd279ce",
+    "logs/benchmark_3w_binary/causal_regularization_v1/tabm_ple_42_predictions.npz": "11525d948f5899f887cffcee7676ab5a464fa5bb61f7110a3c3296296636fc6f",
+    "logs/benchmark_3w_binary/causal_regularization_v1/tabm_ple_43_predictions.npz": "5e259b004d3cc48610083505514eb2d246009f0e117ca14af58357489626a89e",
+    "logs/benchmark_3w_binary/causal_regularization_v1/tabm_ple_44_predictions.npz": "76fcda9a7e0ddf2ed0a06234344924bb474b7943a70577f6ebc2575c5cec180f",
+    "logs/benchmark_3w_binary/causal_regularization_v1/tabm_ple_ensemble_predictions.npz": "e83d0dc077406210d498ea78686e4faaef6151b24fc5558fe5ab4309358300af"
+  },
+  "limitations": [
+    "Validation selects both checkpoints and F1 thresholds.",
+    "Per-well diagnostics below are exploratory development analysis.",
+    "Neither consumed tests nor frozen outer folds are evaluated here.",
+    "Seed population standard deviations do not measure new-well uncertainty."
+  ]
+}

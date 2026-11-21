@@ -1,0 +1,36 @@
+{
+  "decision": "Neural models and full baselines frozen before test loading; the additional same-feature XGB baseline was fixed before reading test results",
+  "split_seed": 20260917,
+  "primary_neural": {
+    "model": "single_row",
+    "feature_family": "variation: standard deviation and energy",
+    "preprocessing": "training-fitted quantile-to-normal transform",
+    "seeds": [42, 43, 44],
+    "prediction": "equal-weight arithmetic mean of probabilities from three fits",
+    "validation_ensemble_auc": 0.9265274556314869,
+    "source_runs": ["grouped_variation_probe::single_row", "grouped_single_row_confirm::single_row"]
+  },
+  "secondary_neural": {
+    "model": "tabm_ple",
+    "feature_family": "all eight engineered blocks",
+    "preprocessing": "training-fitted quantile-to-normal transform",
+    "balance": "sqrt",
+    "seeds": [42, 43, 44],
+    "prediction": "equal-weight arithmetic mean of probabilities from three fits; each fit has 16 shared-weight members",
+    "validation_ensemble_auc": 0.9166511864002578,
+    "source_runs": ["grouped_tabm_confirm::tabm_ple"]
+  },
+  "baselines": ["xgb", "xgb_naive", "rf"],
+  "baseline_source": "grouped_baselines",
+  "additional_paired_baseline": {
+    "model": "xgb",
+    "source": "grouped_ablation_variation",
+    "reason": "Best feature-family XGB validation ensemble (AUC 0.9083449283); exactly the same std/energy inputs as selected TREA",
+    "selected_before_test_results": true
+  },
+  "test_use": "Evaluate frozen fits once; no test-driven tuning, reselection, or split changes",
+  "threshold": "Maximize macro-F1 using internal validation probabilities only; freeze separately for each fit and ensemble",
+  "uncertainty": "Paired bootstrap of entire groups, 500 replicates; seed variation is reported separately",
+  "historical_auc_target": 0.9474,
+  "fair_comparison": "Contemporaneous models on identical reserved groups; historical bar is not a paired test baseline"
+}

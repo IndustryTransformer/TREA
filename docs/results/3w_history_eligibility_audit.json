@@ -1,0 +1,2149 @@
+{
+  "scope": "Fixed internal validation only, no consumed or outer test groups",
+  "raw_full_windows": 186636,
+  "cached_windows": 173464,
+  "all_unlabeled_omissions": 13172,
+  "invalid_median_omissions": 0,
+  "affected_files": [
+    {
+      "file": "0/WELL-00001_20170201010207.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170201060114.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170201110124.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170201160311.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170201210228.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170202020343.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170202070239.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170218000146.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170218050218.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170218100218.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170218150135.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170219010042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170219060031.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170219110021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170219160053.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170219210332.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170421090251.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170422030000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170424170042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170424220156.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170425030207.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170425080343.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170425130042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170520180000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170520230000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170521040000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170521090000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170521140000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170521190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170522000000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170522050000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170522100000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170522150000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170522200000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170523010012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170523060000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170523110000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170523160000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170523210000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170524020000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170524070000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170524120000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170524170000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170524220000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170525030000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170525080000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170525130000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170525180000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170525230000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170526040000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170526090000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170526140000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170526190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170527000000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170527050000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170527100000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170527150000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170527200000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170528010000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170528060000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170528110000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170528160000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170528210000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170626090246.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170626140123.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170626190135.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170627000333.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170823040000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170823092146.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170823140000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170823190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170824000000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170824050000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170824100000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170824150000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170824200000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170825010000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170825060000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170825110000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170825160000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170825210000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170826020000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170826070000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170826120000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170826170000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170826220000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170827030000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170827080000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170827130000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170827180000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170827230000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170828040000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00001_20170828090000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140806210033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140806230129.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807010107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807030137.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807050141.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807070055.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807090112.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807110112.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807130038.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807150311.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807170050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00004_20140807190042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00007_20170801170000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "0/WELL-00007_20170801190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "1/WELL-00001_20140124083303.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "2/WELL-00010_20171218180131.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "2/WELL-00013_20170329010229.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00001_20170320120025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170917140000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170917190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170918010114.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170918060135.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170918110103.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170919200016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170920000042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170920050228.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170920100053.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170920180207.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170920230053.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170921040404.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170921090155.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170921140042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170921190114.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170922000042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170922050124.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170922100042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170922150249.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170925000031.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170925050042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170925100124.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170925150218.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170925200042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170926010340.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170926060042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170926110103.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20170926160228.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20171028070000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20171028120000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "3/WELL-00014_20171028170038.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170316110203.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170316130000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170316150005.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170316170000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170316190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170316210000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170316230000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317010000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317030000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317050000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317070000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317090000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317110000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317130005.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317150000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317170000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317210000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170317230020.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170318010000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170318030000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170318050025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170318070000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170318090000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170318110000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170318130000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170319170033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170320180146.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170421150000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170421170000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170421190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170421210000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170421230000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170422010000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170626050000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00001_20170626070000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140804190012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140804210008.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140804230059.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805010033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805030025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805050008.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805070029.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805090050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805110107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805130016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805150150.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805170137.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805190046.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805210116.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140805230050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806010107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806030012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806050141.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806070215.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806090103.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806110038.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806130050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806150154.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806170008.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20140806190021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141117100021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141117120029.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141117140055.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141117160116.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141117180021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141117200021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141117220046.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118000042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118020016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118040012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118060038.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118080038.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118100025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118120050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118140107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118160016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118180124.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00004_20141118200016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170517200012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170517220025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170518000012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170518020016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170518040016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170518060124.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170518080021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170518100129.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170518120103.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00007_20170518140021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416070150.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416090133.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416110120.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416130038.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416150107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416170029.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416190008.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416210141.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180416230055.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180417010107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180417030033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180417050046.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180422170012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180422190158.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180422210038.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180422230029.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423010129.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423030021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423050353.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423070107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423090050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423110112.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423130025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423150129.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423170042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423190021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423210016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180423230033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424010059.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424030012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424050029.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424070107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424090046.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424110050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424130033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424150129.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424170033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424190133.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424210211.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180424230232.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425010050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425030224.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425050158.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425070141.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425090033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425110029.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425130016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425150107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425170046.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425190116.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425210046.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180425230124.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426010124.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426030033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426050029.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426070025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426090042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426110107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426130141.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426150008.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426170103.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426190107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426210116.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180426230008.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427010029.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427030025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427050042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427070107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427090107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427110016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427130112.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427150025.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427170042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427190340.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427210055.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180427230016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180428010211.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180428030137.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180428050033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180428070033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180428090116.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180428110207.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00010_20180428130249.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170915080021.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170915100033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170915120107.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170915140059.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170915160012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170915180050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170915200116.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170916170016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170916190112.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170916210059.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170916230042.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170917010012.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170917030228.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170917050111.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170917070112.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170917090055.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170917110016.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170923150033.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170923170059.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170923190120.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "4/WELL-00014_20170924160050.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "6/WELL-00004_20171031171509.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "6/WELL-00004_20171031181500.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "6/WELL-00004_20171031184839.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00001_20170226130146.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00022_20180802233838.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00022_20180912025800.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00022_20180919003240.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00022_20180925003447.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00022_20181007080700.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00022_20181020133850.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00022_20181026005827.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "7/WELL-00022_20181101193049.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "8/WELL-00031_20140403170404.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "9/WELL-00010_20180517000402.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "9/WELL-00010_20180715083053.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "9/WELL-00010_20180717234051.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "9/WELL-00010_20180720234103.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "9/WELL-00010_20180723134436.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "9/WELL-00014_20160304155906.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "9/WELL-00014_20160306070000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    },
+    {
+      "file": "9/WELL-00014_20170214190000.parquet",
+      "all_unlabeled_windows": 37,
+      "invalid_median_windows": 0,
+      "omissions_are_prefix": true
+    }
+  ],
+  "all_omissions_are_prefix": true,
+  "distinct_prefix_lengths": [
+    37
+  ]
+}

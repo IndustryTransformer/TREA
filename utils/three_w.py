@@ -25,6 +25,8 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
+import re
 import sys
 
 from pathlib import Path
@@ -81,6 +83,86 @@ EVENT_NAMES = {
 NUM_CLASSES = 10
 
 
+def sanitize_numeric_values(values, value_policy="legacy_clip"):
+    """Prepare float32 sensor values without silently flattening valid pressures.
+
+    The opt-in policy preserves finite values up to 1e12 in magnitude, masking
+    larger values as invalid before downcasting. The cutoff was chosen from a
+    training-only audit: pressures reach 1e7-1e10, while extreme negative artifacts
+    reach 1e15-1e42. It is not a learned bound or a test-derived clipping threshold.
+    """
+    x = np.array(values, dtype=np.float64, copy=True)
+    if value_policy == "legacy_clip":
+        np.clip(x, -1e6, 1e6, out=x)
+    elif value_policy == "preserve_range":
+        x[~np.isfinite(x) | (np.abs(x) > 1e12)] = np.nan
+    else:
+        raise ValueError(f"Unknown value_policy: {value_policy}")
+    return x.astype(np.float32, copy=False)
+
+
+def grouped_file_split(files, holdout_fraction=0.2, internal_val_fraction=0.0, seed=42):
+    """Partition wells; optional validation is drawn only from development wells.
+
+    Files without a WELL id are separate simulation instances, not physical wells.
+    Fractions and group membership are fixed before reading signals or labels.
+    """
+    if not 0 < holdout_fraction < 1 or not 0 <= internal_val_fraction < 1:
+        raise ValueError("Invalid split fractions")
+    groups = np.array(
+        [
+            m.group(0) if (m := re.search(r"WELL-\d+", str(p))) else f"sim-{i}"
+            for i, p in enumerate(files)
+        ]
+    )
+    wells = np.array(sorted(set(groups)))
+    order = np.random.RandomState(seed).permutation(len(wells))
+    n_test = max(1, int(round(len(wells) * holdout_fraction)))
+    test = set(wells[order[:n_test]])
+    remaining = wells[order[n_test:]]
+    n_val = (
+        max(1, int(round(len(remaining) * internal_val_fraction)))
+        if internal_val_fraction
+        else 0
+    )
+    val = set(np.random.RandomState(seed + 1).permutation(remaining)[:n_val])
+    train = set(remaining) - val
+    if not train or (internal_val_fraction and not val):
+        raise ValueError("Too few groups for the requested split")
+    partitions = {
+        "train": train,
+        "val": val if internal_val_fraction else test,
+        "test": test,
+    }
+    return groups, {
+        name: np.flatnonzero(np.isin(groups, list(ids)))
+        for name, ids in partitions.items()
+    }
+
+
+def frozen_group_split(files, manifest):
+    """Validate complete frozen membership against the exact file inventory."""
+    if list(map(str, files)) != sorted(map(str, files)):
+        raise ValueError("Frozen simulation group IDs require canonical file order")
+    digest = hashlib.sha256("\n".join(sorted(map(str, files))).encode()).hexdigest()
+    if digest != manifest["file_inventory_sha256"]:
+        raise ValueError("Frozen protocol file inventory mismatch")
+    groups, _ = grouped_file_split(files)
+    partitions = manifest["partitions"]
+    if set(partitions) != {"train", "val", "test", "excluded"}:
+        raise ValueError("Frozen protocol requires train/val/test/excluded")
+    flattened = [g for gs in partitions.values() for g in gs]
+    if len(flattened) != len(set(flattened)):
+        raise ValueError("Duplicate or overlapping frozen groups")
+    if set(flattened) != set(groups):
+        raise ValueError("Frozen protocol must cover every group exactly once")
+    if any(not partitions[s] for s in ["train", "val", "test"]):
+        raise ValueError("Empty frozen development or test partition")
+    return groups, {
+        name: np.flatnonzero(np.isin(groups, ids)) for name, ids in partitions.items()
+    }
+
+
 def _load_toolkit(toolkit_path: str):
     """Import ThreeWToolkit, adding toolkit_path to sys.path if needed."""
     toolkit_dir = str(Path(toolkit_path) / "toolkit")
@@ -106,10 +188,11 @@ class ThreeWDataset(Dataset):
             Defaults to ``{toolkit_path}/dataset``.
         window_size: Sliding window length (T).
         stride: Sliding window stride.
-        split: One of "train", "val", or "test".
-            Train/val are split at the file level (80/20) from all files.
-            "test" currently uses the same pool — provide a fold-based
-            file list via ``file_list`` for proper held-out evaluation.
+        split: One of "train", "val", or "test". Legacy two-way splitting
+            aliases test to val. Set internal_val_fraction > 0 with well mode
+            to reserve a distinct test partition before selecting validation.
+        internal_val_fraction: Fraction of non-test groups used for internal
+            validation. Zero preserves the legacy two-way protocol.
         val_fraction: Fraction of files held out for validation.
         normalization_stats: Pre-computed {"mean": array, "std": array} from
             the training set. If None, stats are computed from this dataset.
@@ -139,6 +222,9 @@ class ThreeWDataset(Dataset):
         seed: int = 42,
         augment: bool = False,
         max_feature_nan_rate: float = MAX_FEATURE_NAN_RATE,
+        internal_val_fraction: float = 0.0,
+        value_policy: str = "legacy_clip",
+        group_manifest: dict | None = None,
     ):
         self.window_size = window_size
         self.stride = stride
@@ -146,6 +232,9 @@ class ThreeWDataset(Dataset):
         self.split = split
         self.augment = augment
         self.max_feature_nan_rate = max_feature_nan_rate
+        if value_policy not in {"legacy_clip", "preserve_range"}:
+            raise ValueError(f"Unknown value_policy: {value_policy}")
+        self.value_policy = value_policy
         self.feature_names = list(SENSOR_COLUMNS)
         self.feature_indices = np.arange(len(SENSOR_COLUMNS), dtype=np.int64)
         self.n_features = len(self.feature_names)
@@ -173,30 +262,26 @@ class ThreeWDataset(Dataset):
         rng = np.random.RandomState(seed)
 
         if split_mode == "well":
-            import re as _re
-
-            well_of = np.array(
-                [
-                    (
-                        m.group(0)
-                        if (m := _re.search(r"WELL-\d+", str(p)))
-                        else f"sim-{i}"
-                    )
-                    for i, p in enumerate(parquet_ds.files_events)
-                ]
+            well_of, partitions = grouped_file_split(
+                parquet_ds.files_events, val_fraction, internal_val_fraction, seed
             )
-            wells = np.array(sorted(set(well_of)))
-            wperm = rng.permutation(len(wells))
-            n_val_wells = max(1, int(round(len(wells) * val_fraction)))
-            val_wells = set(wells[wperm[:n_val_wells]])
-            is_val = np.array([w in val_wells for w in well_of])
-            train_indices = np.where(~is_val)[0]
-            val_indices = np.where(is_val)[0]
+            if group_manifest is not None:
+                if not internal_val_fraction:
+                    raise ValueError("Frozen protocol requires three-way splitting")
+                well_of, partitions = frozen_group_split(
+                    parquet_ds.files_events, group_manifest
+                )
+            train_indices, val_indices = partitions["train"], partitions["val"]
             print(
-                f"[ThreeWDataset] well-grouped split: {len(wells)} wells "
-                f"-> {len(wells) - n_val_wells} train / {n_val_wells} val"
+                f"[ThreeWDataset] grouped split: "
+                f"{ {k: len(set(well_of[v])) for k, v in partitions.items()} }"
             )
         elif split_mode == "random":
+            if internal_val_fraction or group_manifest is not None:
+                raise ValueError(
+                    "Internal grouped validation requires split_mode='well'"
+                )
+            well_of = np.array([f"file-{i}" for i in range(n_total)])
             file_indices = rng.permutation(n_total)
             n_val = int(n_total * val_fraction)
             train_indices = file_indices[: n_total - n_val]
@@ -209,8 +294,10 @@ class ThreeWDataset(Dataset):
         if split == "train":
             selected_indices = train_indices
         elif split in ("val", "test"):
-            # Default: use val set as test. Override with file_list for proper eval.
+            # Preserve the legacy alias unless the three-way protocol is enabled.
             selected_indices = val_indices
+            if split == "test" and internal_val_fraction:
+                selected_indices = partitions["test"]
         else:
             raise ValueError(
                 f"Unknown split: {split!r}. Use 'train', 'val', or 'test'."
@@ -218,6 +305,10 @@ class ThreeWDataset(Dataset):
 
         if max_files is not None:
             selected_indices = selected_indices[:max_files]
+        self.selected_files = [
+            str(parquet_ds.files_events[i]) for i in selected_indices
+        ]
+        self.selected_groups = sorted(set(well_of[selected_indices]))
 
         # Count files per class directory to identify rare classes
         rare_classes = set()
@@ -242,6 +333,8 @@ class ThreeWDataset(Dataset):
         # Extract windows from each file
         all_windows = []
         all_labels = []
+        all_file_ids = []
+        all_group_ids = []
         n_files = len(selected_indices)
 
         print(f"[ThreeWDataset] Loading {n_files} files for split={split!r}...")
@@ -260,10 +353,9 @@ class ThreeWDataset(Dataset):
             available = [c for c in SENSOR_COLUMNS if c in signal.columns]
             missing = [c for c in SENSOR_COLUMNS if c not in signal.columns]
 
-            # Clip in float64 before downcasting to avoid overflow warnings on cast.
-            features = signal[available].to_numpy(dtype=np.float64, copy=True)
-            np.clip(features, -1e6, 1e6, out=features)
-            features = features.astype(np.float32, copy=False)
+            features = sanitize_numeric_values(
+                signal[available].to_numpy(dtype=np.float64, copy=False), value_policy
+            )
 
             # Add NaN columns for any missing sensors
             if missing:
@@ -317,6 +409,8 @@ class ThreeWDataset(Dataset):
                 # Store as (C, T) — channels first for TREA-C
                 all_windows.append(features[start:end].T)  # [C, T]
                 all_labels.append(window_label)
+                all_file_ids.append(int(file_idx))
+                all_group_ids.append(well_of[file_idx])
 
             if (i + 1) % 200 == 0 or i == n_files - 1:
                 print(
@@ -326,6 +420,8 @@ class ThreeWDataset(Dataset):
 
         self.windows = np.array(all_windows, dtype=np.float32)  # [N, C, T]
         self.labels = np.array(all_labels, dtype=np.int64)  # [N]
+        self.file_ids = np.asarray(all_file_ids, dtype=np.int64)
+        self.group_ids = np.asarray(all_group_ids)
 
         print(
             f"[ThreeWDataset] {split}: {len(self.labels)} windows from {n_files} files"

@@ -19,6 +19,7 @@ import csv
 import datetime as dt
 import json
 import sys
+import tempfile
 import time
 
 from pathlib import Path
@@ -30,11 +31,12 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 
-from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.neighbors import LocalOutlierFactor
 from torch.utils.data import DataLoader, WeightedRandomSampler
+from xgboost import XGBClassifier
 
 
 sys.path.insert(0, ".")
@@ -46,8 +48,9 @@ from utils.three_w import ThreeWDataset
 DEEP_MODELS = {
     "trea_triple",
     "trea_triple_stat_tokens",
+    "trea_triple_stat_tokens_no_feature_attn",
 }
-CLASSICAL_MODELS = {"rf", "lof", "tabicl"}
+CLASSICAL_MODELS = {"xgb_naive", "xgb_engineered", "rf", "lof", "tabicl"}
 ALL_MODELS = DEEP_MODELS | CLASSICAL_MODELS
 
 
@@ -159,7 +162,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--models",
         type=str,
-        default="trea_triple_stat_tokens,rf,lof",
+        default="trea_triple_stat_tokens,xgb_naive,xgb_engineered,rf",
         help=f"Comma-separated model IDs from: {sorted(ALL_MODELS)}",
     )
     parser.add_argument(
@@ -174,6 +177,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--sampling-power", type=float, default=0.5)
     parser.add_argument("--max-epochs", type=int, default=30)
+    parser.add_argument("--early-stopping-patience", type=int, default=10)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-2)
     parser.add_argument("--gradient-clip-val", type=float, default=1.0)
@@ -183,12 +187,20 @@ def parse_args() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=True,
     )
+    parser.add_argument(
+        "--ensemble-deep-seeds",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Average probabilities from independently trained deep seeds.",
+    )
 
     # Architecture
-    parser.add_argument("--d-model", type=int, default=256)
-    parser.add_argument("--n-head", type=int, default=8)
-    parser.add_argument("--num-layers", type=int, default=4)
-    parser.add_argument("--dropout", type=float, default=0.3)
+    # Compact recipe transferred from the single-row experiments in 4925711.
+    # This is a new 3W experiment, not evidence that any one setting is causal.
+    parser.add_argument("--d-model", type=int, default=128)
+    parser.add_argument("--n-head", type=int, default=4)
+    parser.add_argument("--num-layers", type=int, default=2)
+    parser.add_argument("--dropout", type=float, default=0.0)
     parser.add_argument("--patch-len", type=int, default=16)
     parser.add_argument("--patch-stride", type=int, default=8)
     parser.add_argument("--pooling", type=str, default="mean")
@@ -199,6 +211,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rf-n-estimators", type=int, default=500)
     parser.add_argument("--rf-n-jobs", type=int, default=-1)
     parser.add_argument("--rf-train-max-samples", type=int, default=200000)
+    parser.add_argument("--xgb-train-max-samples", type=int, default=200000)
+    parser.add_argument("--xgb-n-estimators", type=int, default=500)
+    parser.add_argument("--xgb-max-depth", type=int, default=6)
+    parser.add_argument("--xgb-learning-rate", type=float, default=0.05)
+    parser.add_argument("--xgb-subsample", type=float, default=0.8)
+    parser.add_argument("--xgb-colsample-bytree", type=float, default=0.8)
+    parser.add_argument("--xgb-n-jobs", type=int, default=-1)
+    parser.add_argument(
+        "--xgb-naive-time-points",
+        type=int,
+        default=12,
+        help="Evenly spaced raw samples per sensor for the naive XGBoost baseline.",
+    )
     parser.add_argument(
         "--tabicl-train-max-samples",
         type=int,
@@ -220,9 +245,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def extract_engineered_features(
-    windows: np.ndarray, chunk: int = 50_000
-) -> np.ndarray:
+def extract_engineered_features(windows: np.ndarray, chunk: int = 50_000) -> np.ndarray:
     """Create fixed-size feature vectors from [N, C, T] windows.
 
     Chunked: the nan-reductions below allocate several full-size temporaries, which
@@ -258,6 +281,24 @@ def extract_engineered_features(
     blocks = [mean, std, min_v, max_v, nan_rate, delta, trend, energy]
     out = np.concatenate(blocks, axis=1)
     return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+
+
+def extract_naive_features(windows: np.ndarray, time_points: int = 12) -> np.ndarray:
+    """Flatten an evenly sampled raw grid, leaving NaNs for XGBoost.
+
+    This baseline deliberately avoids hand-built distribution or trend features. A
+    small fixed grid makes the baseline tractable on hundreds of thousands of 3W
+    windows while still exposing temporal order to the tree.
+    """
+    x = np.asarray(windows, dtype=np.float32)
+    if x.ndim != 3:
+        raise ValueError(f"Expected [N, C, T] windows, got shape={x.shape}")
+    if time_points <= 0:
+        raise ValueError("time_points must be positive")
+    indices = np.linspace(0, x.shape[2] - 1, min(time_points, x.shape[2]), dtype=int)
+    out = x[:, :, indices].reshape(len(x), -1)
+    # XGBoost handles NaN natively; infinities are not valid missing values.
+    return np.where(np.isinf(out), np.nan, out).astype(np.float32, copy=False)
 
 
 def binary_metrics(
@@ -311,10 +352,29 @@ def binary_metrics(
     }
 
 
+def ensemble_binary_outputs(outputs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Average independently trained probability predictions."""
+    if len(outputs) < 2:
+        raise ValueError("At least two independently trained outputs are required")
+    reference_targets = np.asarray(outputs[0]["targets"])
+    if any(
+        not np.array_equal(np.asarray(o["targets"]), reference_targets)
+        for o in outputs[1:]
+    ):
+        raise ValueError("Target order changed across deep-model seeds")
+    mean_scores = np.mean([np.asarray(o["scores"]) for o in outputs], axis=0)
+    metrics = binary_metrics(
+        (mean_scores >= 0.5).astype(np.int64), reference_targets, mean_scores
+    )
+    metrics["train_seconds"] = float(sum(o["train_seconds"] for o in outputs))
+    metrics["num_params"] = int(sum(o["num_params"] for o in outputs))
+    return metrics
+
+
 @torch.no_grad()
 def evaluate_torch_binary(
     model: pl.LightningModule, dataloader: DataLoader
-) -> dict[str, float]:
+) -> tuple[dict[str, float], np.ndarray, np.ndarray]:
     """Evaluate a PyTorch model on binary classification."""
     device = model.device
     model.eval()
@@ -339,13 +399,14 @@ def evaluate_torch_binary(
     preds = np.concatenate(all_preds)
     targets = np.concatenate(all_targets)
     scores = np.concatenate(all_scores)
-    return binary_metrics(preds, targets, scores)
+    return binary_metrics(preds, targets, scores), scores, targets
 
 
 def build_trea(
     info: dict[str, Any],
     args: argparse.Namespace,
     use_stat_tokens: bool,
+    use_feature_attention: bool,
 ) -> TriplePatchTransformer:
     """Build a TREA-C model for binary classification."""
     model = TriplePatchTransformer(
@@ -365,7 +426,7 @@ def build_trea(
         stride=args.patch_stride,
         column_names=info["column_names"],
         use_column_embeddings=True,
-        use_pre_patch_feature_attention=True,
+        use_pre_patch_feature_attention=use_feature_attention,
         feature_attention_dim=args.feature_attention_dim,
         feature_attention_heads=args.feature_attention_heads,
         use_stat_tokens=use_stat_tokens,
@@ -393,7 +454,12 @@ def run_deep_model(
     dm.set_sampler_seed(seed)
 
     use_stat_tokens = "stat_tokens" in model_name
-    model = build_trea(info=info, args=args, use_stat_tokens=use_stat_tokens)
+    model = build_trea(
+        info=info,
+        args=args,
+        use_stat_tokens=use_stat_tokens,
+        use_feature_attention="no_feature_attn" not in model_name,
+    )
 
     # Override validation_step to log val_loss for early stopping
     def validation_step_binary(batch, batch_idx):
@@ -404,26 +470,51 @@ def run_deep_model(
 
     model.validation_step = validation_step_binary
 
-    early_stop = EarlyStopping(monitor="val_loss", patience=5, mode="min", verbose=True)
-
-    trainer = pl.Trainer(
-        max_epochs=args.max_epochs,
-        accelerator="auto",
-        devices=1,
-        precision=args.precision,
-        logger=False,
-        enable_progress_bar=args.show_progress,
-        gradient_clip_val=args.gradient_clip_val,
-        callbacks=[early_stop],
+    early_stop = EarlyStopping(
+        monitor="val_loss",
+        patience=args.early_stopping_patience,
+        mode="min",
+        verbose=True,
     )
 
-    t0 = time.perf_counter()
-    trainer.fit(model, datamodule=dm)
-    train_seconds = time.perf_counter() - t0
+    with tempfile.TemporaryDirectory(prefix="trea-3w-best-") as checkpoint_dir:
+        checkpoint = ModelCheckpoint(
+            dirpath=checkpoint_dir,
+            monitor="val_loss",
+            mode="min",
+            save_top_k=1,
+            save_weights_only=True,
+        )
+        trainer = pl.Trainer(
+            max_epochs=args.max_epochs,
+            accelerator="auto",
+            devices=1,
+            precision=args.precision,
+            logger=False,
+            enable_progress_bar=args.show_progress,
+            gradient_clip_val=args.gradient_clip_val,
+            callbacks=[early_stop, checkpoint],
+        )
 
-    metrics = evaluate_torch_binary(model=model, dataloader=dm.val_dataloader())
+        t0 = time.perf_counter()
+        trainer.fit(model, datamodule=dm)
+        train_seconds = time.perf_counter() - t0
+
+        if checkpoint.best_model_path:
+            state = torch.load(
+                checkpoint.best_model_path,
+                map_location=model.device,
+                weights_only=False,
+            )
+            model.load_state_dict(state["state_dict"])
+
+    metrics, scores, targets = evaluate_torch_binary(
+        model=model, dataloader=dm.val_dataloader()
+    )
     metrics["train_seconds"] = train_seconds
     metrics["num_params"] = int(sum(p.numel() for p in model.parameters()))
+    metrics["_scores"] = scores
+    metrics["_targets"] = targets
     return metrics
 
 
@@ -460,9 +551,64 @@ def run_rf_baseline(
     pred = clf.predict(x_val)
     proba = clf.predict_proba(x_val)
     classes = list(clf.classes_)
-    score = (
-        proba[:, classes.index(1)] if 1 in classes else np.zeros(len(x_val))
+    score = proba[:, classes.index(1)] if 1 in classes else np.zeros(len(x_val))
+    metrics = binary_metrics(pred, y_val, score)
+    metrics["train_seconds"] = train_seconds
+    metrics["num_params"] = 0
+    return metrics
+
+
+def run_xgb_baseline(
+    train_ds: ThreeWDataset,
+    val_ds: ThreeWDataset,
+    seed: int,
+    args: argparse.Namespace,
+    *,
+    engineered: bool,
+) -> dict[str, Any]:
+    """XGBoost on either a raw temporal grid or handcrafted statistics."""
+    rng = np.random.default_rng(seed)
+    if engineered:
+        x_train = extract_engineered_features(train_ds.windows)
+        x_val = extract_engineered_features(val_ds.windows)
+    else:
+        x_train = extract_naive_features(
+            train_ds.windows, time_points=args.xgb_naive_time_points
+        )
+        x_val = extract_naive_features(
+            val_ds.windows, time_points=args.xgb_naive_time_points
+        )
+    y_train = train_ds.labels.copy()
+    y_val = val_ds.labels.copy()
+
+    cap = args.xgb_train_max_samples
+    if cap and len(y_train) > cap:
+        idx = rng.choice(len(y_train), size=cap, replace=False)
+        x_train = x_train[idx]
+        y_train = y_train[idx]
+
+    negatives = max(1, int((y_train == 0).sum()))
+    positives = max(1, int((y_train == 1).sum()))
+    clf = XGBClassifier(
+        n_estimators=args.xgb_n_estimators,
+        max_depth=args.xgb_max_depth,
+        learning_rate=args.xgb_learning_rate,
+        subsample=args.xgb_subsample,
+        colsample_bytree=args.xgb_colsample_bytree,
+        objective="binary:logistic",
+        eval_metric="auc",
+        tree_method="hist",
+        scale_pos_weight=negatives / positives,
+        random_state=seed,
+        n_jobs=args.xgb_n_jobs,
     )
+
+    t0 = time.perf_counter()
+    clf.fit(x_train, y_train)
+    train_seconds = time.perf_counter() - t0
+
+    score = clf.predict_proba(x_val)[:, 1]
+    pred = (score >= 0.5).astype(np.int64)
     metrics = binary_metrics(pred, y_val, score)
     metrics["train_seconds"] = train_seconds
     metrics["num_params"] = 0
@@ -636,7 +782,7 @@ def build_report(
         "Our LOF baseline replicates this protocol."
     )
     lines.append(
-        "- TREA-C and RF use **supervised binary** classification "
+        "- TREA-C, XGBoost, and RF use **supervised binary** classification "
         "(trained on both normal and anomaly windows)."
     )
     lines.append(
@@ -646,7 +792,8 @@ def build_report(
     )
     lines.append(
         "- TREA-C processes raw time series with NaN handling. "
-        "RF and LOF use handcrafted statistical features (mean, std, min, max, etc.)."
+        "Naive XGBoost uses an evenly sampled raw temporal grid. Engineered "
+        "XGBoost, RF, and LOF use handcrafted window statistics."
     )
     lines.append("")
 
@@ -723,6 +870,7 @@ def main() -> None:
 
     # Run benchmarks
     runs: list[dict[str, Any]] = []
+    deep_outputs: dict[str, list[dict[str, Any]]] = {}
     out_dir = Path(args.output_dir) / args.run_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -767,6 +915,14 @@ def main() -> None:
                     seed=seed,
                     args=args,
                 )
+            elif model_name in {"xgb_naive", "xgb_engineered"}:
+                metrics = run_xgb_baseline(
+                    train_ds=train_ds,
+                    val_ds=val_ds,
+                    seed=seed,
+                    args=args,
+                    engineered=model_name == "xgb_engineered",
+                )
             elif model_name == "tabicl":
                 metrics = run_tabicl_baseline(
                     train_ds=train_ds,
@@ -784,6 +940,18 @@ def main() -> None:
             else:
                 raise ValueError(f"Unsupported model: {model_name}")
 
+            scores = metrics.pop("_scores", None)
+            targets = metrics.pop("_targets", None)
+            if scores is not None and targets is not None:
+                deep_outputs.setdefault(model_name, []).append(
+                    {
+                        "scores": scores,
+                        "targets": targets,
+                        "train_seconds": metrics["train_seconds"],
+                        "num_params": metrics["num_params"],
+                    }
+                )
+
             row: dict[str, Any] = {"model": model_name, "seed": seed, **metrics}
             runs.append(row)
 
@@ -794,6 +962,24 @@ def main() -> None:
                 f"accuracy={metrics['accuracy']:.4f} "
                 f"(TP={metrics['tp']} FP={metrics['fp']} "
                 f"FN={metrics['fn']} TN={metrics['tn']})"
+            )
+
+    ensemble_names: list[str] = []
+    if args.ensemble_deep_seeds:
+        for model_name, outputs in deep_outputs.items():
+            if len(outputs) < 2:
+                print(
+                    f"\nSkipping {model_name} ensemble: need at least two deep seeds."
+                )
+                continue
+            ensemble_metrics = ensemble_binary_outputs(outputs)
+            ensemble_name = f"{model_name}_ensemble"
+            ensemble_names.append(ensemble_name)
+            runs.append({"model": ensemble_name, "seed": -1, **ensemble_metrics})
+            print(
+                f"\n[{ensemble_name}] auc={ensemble_metrics['auc']:.4f} "
+                f"macro_f1={ensemble_metrics['macro_f1']:.4f} "
+                f"(explicit {len(outputs)}-fit probability average)"
             )
 
     # Save results
@@ -816,7 +1002,8 @@ def main() -> None:
     ]
     write_csv(out_dir / "runs.csv", runs, fieldnames)
 
-    report = build_report(runs, models)
+    report_models = [*models, *ensemble_names]
+    report = build_report(runs, report_models)
     (out_dir / "report.md").write_text(report, encoding="utf-8")
 
     # Print summary
@@ -830,7 +1017,7 @@ def main() -> None:
     print("-" * 76)
 
     means: dict[str, dict[str, float]] = {}
-    for model_name in models:
+    for model_name in report_models:
         model_runs = [r for r in runs if r["model"] == model_name]
         if not model_runs:
             continue
@@ -851,7 +1038,12 @@ def main() -> None:
 
     # Pre-registered LESSONS.md section 3 gate: deep beats RF on AUC over unseen
     # wells (well-disjoint split). Only adjudicable when run with --split-mode well.
-    deep_names = [m for m in models if m in DEEP_MODELS and m in means]
+    deep_names = [
+        m
+        for m in report_models
+        if (m in DEEP_MODELS or m.removesuffix("_ensemble") in DEEP_MODELS)
+        and m in means
+    ]
     if args.split_mode == "well" and deep_names and "rf" in means:
         best_deep = max(deep_names, key=lambda m: means[m]["auc"])
         d_auc, rf_auc = means[best_deep]["auc"], means["rf"]["auc"]
@@ -860,6 +1052,19 @@ def main() -> None:
             f"\n=== SECTION-3 GATE (well-disjoint AUC): deep {best_deep} "
             f"{d_auc:.4f} vs RF {rf_auc:.4f} -> {verdict} ==="
         )
+
+    if args.split_mode == "well" and deep_names:
+        best_deep = max(deep_names, key=lambda m: means[m]["auc"])
+        for baseline in ("xgb_naive", "xgb_engineered"):
+            if baseline not in means:
+                continue
+            d_auc = means[best_deep]["auc"]
+            baseline_auc = means[baseline]["auc"]
+            verdict = "PASS" if d_auc > baseline_auc else "FAIL"
+            print(
+                f"=== NEW COMPACT-RECIPE GATE: deep {best_deep} {d_auc:.4f} "
+                f"vs {baseline} {baseline_auc:.4f} -> {verdict} ==="
+            )
 
     print(f"\nResults saved to: {out_dir}")
     print(f"  - {out_dir / 'runs.csv'}")

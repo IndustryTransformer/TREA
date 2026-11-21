@@ -1,0 +1,1456 @@
+{
+  "scope": "Freeze four outer group folds within current training groups, without signals.\n\nThe current internal validation remains fixed for selection. Both consumed test\npartitions are excluded. This is a development-population robustness study with\nhistorical fitting exposure, not a newly acquired external confirmation cohort.\n",
+  "plan": {
+    "parent_sha256": "2060da4a5cadfd2c0091d58c05f08e0e48a9372ad63b0c56dc9fe9141445eac4",
+    "scope": "Freeze four outer group folds within current training groups, without signals.\n\nThe current internal validation remains fixed for selection. Both consumed test\npartitions are excluded. This is a development-population robustness study with\nhistorical fitting exposure, not a newly acquired external confirmation cohort.\n",
+    "seeds_per_recipe": [
+      42,
+      43,
+      44
+    ],
+    "neural_candidates": [
+      "single_row_window",
+      "single_row_causal",
+      "tabm_ple_causal"
+    ],
+    "tree_candidates": [
+      "xgb_window",
+      "xgb_causal"
+    ],
+    "shared_recipe": {
+      "group_loss_power": 0.5,
+      "value_policy": "preserve_range",
+      "train_cap": 200000,
+      "width": 128,
+      "layers": 2,
+      "dropout": 0,
+      "lr": 0.0003,
+      "epochs": 30,
+      "patience": 6,
+      "causal_alpha": 0.1
+    },
+    "selection": "Within each outer fold select neural and tree recipes by highest three-fit ensemble AUC on fixed internal validation; no outer selection.",
+    "threshold": "Exact macro-F1 optimum on internal validation only.",
+    "unblinding": "Fit all candidates/all folds, save selection and hashes, then evaluate outer groups. No outer-driven refitting or threshold tuning.",
+    "reporting": [
+      "Each outer-fold AUC and macro-F1",
+      "Mean and spread across outer folds",
+      "Pooled out-of-fold per-window metrics",
+      "Single-fit and explicit three-fit ensembles separately",
+      "Physical-only and simulation-only results",
+      "Paired whole-group uncertainty and historical exposure"
+    ],
+    "fold_counts": [
+      {
+        "train": {
+          "groups": 411,
+          "physical_wells": 15
+        },
+        "val": {
+          "groups": 230,
+          "physical_wells": 8
+        },
+        "test": {
+          "groups": 138,
+          "physical_wells": 5
+        },
+        "excluded": {
+          "groups": 370,
+          "physical_wells": 12
+        }
+      },
+      {
+        "train": {
+          "groups": 412,
+          "physical_wells": 15
+        },
+        "val": {
+          "groups": 230,
+          "physical_wells": 8
+        },
+        "test": {
+          "groups": 137,
+          "physical_wells": 5
+        },
+        "excluded": {
+          "groups": 370,
+          "physical_wells": 12
+        }
+      },
+      {
+        "train": {
+          "groups": 412,
+          "physical_wells": 15
+        },
+        "val": {
+          "groups": 230,
+          "physical_wells": 8
+        },
+        "test": {
+          "groups": 137,
+          "physical_wells": 5
+        },
+        "excluded": {
+          "groups": 370,
+          "physical_wells": 12
+        }
+      },
+      {
+        "train": {
+          "groups": 412,
+          "physical_wells": 15
+        },
+        "val": {
+          "groups": 230,
+          "physical_wells": 8
+        },
+        "test": {
+          "groups": 137,
+          "physical_wells": 5
+        },
+        "excluded": {
+          "groups": 370,
+          "physical_wells": 12
+        }
+      }
+    ]
+  },
+  "folds": [
+    {
+      "fold": 0,
+      "candidates": [
+        {
+          "candidate": "xgb_window",
+          "model": "xgb",
+          "view": "window",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_0/window",
+          "validation": {
+            "auc": 0.6880464137688871,
+            "accuracy": 0.6737593967624407,
+            "anomaly_precision": 0.8564337597984085,
+            "anomaly_recall": 0.7188453731173791,
+            "anomaly_f1": 0.7816309284476738,
+            "normal_f1": 0.3552720022785531,
+            "macro_f1": 0.5684514653631134,
+            "tp": 101281,
+            "fp": 16978,
+            "fn": 39613,
+            "tn": 15592,
+            "macro_f1_at_05": 0.5466515256026327,
+            "threshold_from_validation": 0.9534367918968201,
+            "instance_majority": {
+              "auc": 0.45532424465733234,
+              "accuracy": 0.5121107266435986,
+              "anomaly_precision": 0.7633136094674556,
+              "anomaly_recall": 0.5608695652173913,
+              "anomaly_f1": 0.6466165413533834,
+              "normal_f1": 0.2122905027932961,
+              "macro_f1": 0.42945352207333976,
+              "tp": 258,
+              "fp": 80,
+              "fn": 202,
+              "tn": 38
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "single_row_window",
+          "model": "single_row",
+          "view": "window",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_0/window",
+          "validation": {
+            "auc": 0.8585282998262087,
+            "accuracy": 0.8122434626204861,
+            "anomaly_precision": 0.9424209503116244,
+            "anomaly_recall": 0.8188709242409187,
+            "anomaly_f1": 0.8763125814132775,
+            "normal_f1": 0.6104699142457332,
+            "macro_f1": 0.7433912478295053,
+            "tp": 115374,
+            "fp": 7049,
+            "fn": 25520,
+            "tn": 25521,
+            "macro_f1_at_05": 0.5455354347568462,
+            "threshold_from_validation": 0.8774289488792419,
+            "instance_majority": {
+              "auc": 0.6896831245394253,
+              "accuracy": 0.6314878892733564,
+              "anomaly_precision": 0.9458483754512635,
+              "anomaly_recall": 0.5695652173913044,
+              "anomaly_f1": 0.7109905020352781,
+              "normal_f1": 0.4916467780429594,
+              "macro_f1": 0.6013186400391188,
+              "tp": 262,
+              "fp": 15,
+              "fn": 198,
+              "tn": 103
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "xgb_causal",
+          "model": "xgb",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_0/causal",
+          "validation": {
+            "auc": 0.8888062524321911,
+            "accuracy": 0.8159560485172715,
+            "anomaly_precision": 0.951086641553173,
+            "anomaly_recall": 0.8153434496855793,
+            "anomaly_f1": 0.8779993809208992,
+            "normal_f1": 0.6255088036223299,
+            "macro_f1": 0.7517540922716146,
+            "tp": 114877,
+            "fp": 5908,
+            "fn": 26017,
+            "tn": 26662,
+            "macro_f1_at_05": 0.7423162475296765,
+            "threshold_from_validation": 0.7755885124206543,
+            "instance_majority": {
+              "auc": 0.6773212969786293,
+              "accuracy": 0.6228373702422145,
+              "anomaly_precision": 0.9653846153846154,
+              "anomaly_recall": 0.5456521739130434,
+              "anomaly_f1": 0.6972222222222222,
+              "normal_f1": 0.4999999999999999,
+              "macro_f1": 0.598611111111111,
+              "tp": 251,
+              "fp": 9,
+              "fn": 209,
+              "tn": 109
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "single_row_causal",
+          "model": "single_row",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_0/causal",
+          "validation": {
+            "auc": 0.9294734555899345,
+            "accuracy": 0.8669349259788774,
+            "anomaly_precision": 0.9640167627690078,
+            "anomaly_recall": 0.8685962496628671,
+            "anomaly_f1": 0.9138223280889479,
+            "normal_f1": 0.7081405052727411,
+            "macro_f1": 0.8109814166808444,
+            "tp": 122380,
+            "fp": 4568,
+            "fn": 18514,
+            "tn": 28002,
+            "macro_f1_at_05": 0.8098201817949018,
+            "threshold_from_validation": 0.600432813167572,
+            "instance_majority": {
+              "auc": 0.8018422991893883,
+              "accuracy": 0.6245674740484429,
+              "anomaly_precision": 1.0,
+              "anomaly_recall": 0.5282608695652173,
+              "anomaly_f1": 0.6913229018492176,
+              "normal_f1": 0.5209713024282561,
+              "macro_f1": 0.6061471021387368,
+              "tp": 243,
+              "fp": 0,
+              "fn": 217,
+              "tn": 118
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "tabm_ple_causal",
+          "model": "tabm_ple",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_0/causal",
+          "validation": {
+            "auc": 0.9283285426756347,
+            "accuracy": 0.8780669187843011,
+            "anomaly_precision": 0.9433185490140907,
+            "anomaly_recall": 0.9042116768634576,
+            "anomaly_f1": 0.9233512232421442,
+            "normal_f1": 0.7020188501148193,
+            "macro_f1": 0.8126850366784818,
+            "tp": 127398,
+            "fp": 7655,
+            "fn": 13496,
+            "tn": 24915,
+            "macro_f1_at_05": 0.8055700994317007,
+            "threshold_from_validation": 0.5897053480148315,
+            "instance_majority": {
+              "auc": 0.8609432571849669,
+              "accuracy": 0.7491349480968859,
+              "anomaly_precision": 0.981651376146789,
+              "anomaly_recall": 0.6978260869565217,
+              "anomaly_f1": 0.8157560355781448,
+              "normal_f1": 0.6070460704607047,
+              "macro_f1": 0.7114010530194248,
+              "tp": 321,
+              "fp": 6,
+              "fn": 139,
+              "tn": 112
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        }
+      ],
+      "selected_neural": {
+        "candidate": "single_row_causal",
+        "model": "single_row",
+        "view": "causal",
+        "directory": "logs/benchmark_3w_binary/robustness_v1/fold_0/causal",
+        "validation": {
+          "auc": 0.9294734555899345,
+          "accuracy": 0.8669349259788774,
+          "anomaly_precision": 0.9640167627690078,
+          "anomaly_recall": 0.8685962496628671,
+          "anomaly_f1": 0.9138223280889479,
+          "normal_f1": 0.7081405052727411,
+          "macro_f1": 0.8109814166808444,
+          "tp": 122380,
+          "fp": 4568,
+          "fn": 18514,
+          "tn": 28002,
+          "macro_f1_at_05": 0.8098201817949018,
+          "threshold_from_validation": 0.600432813167572,
+          "instance_majority": {
+            "auc": 0.8018422991893883,
+            "accuracy": 0.6245674740484429,
+            "anomaly_precision": 1.0,
+            "anomaly_recall": 0.5282608695652173,
+            "anomaly_f1": 0.6913229018492176,
+            "normal_f1": 0.5209713024282561,
+            "macro_f1": 0.6061471021387368,
+            "tp": 243,
+            "fp": 0,
+            "fn": 217,
+            "tn": 118
+          }
+        },
+        "fit_seeds": [
+          42,
+          43,
+          44
+        ]
+      },
+      "selected_tree": {
+        "candidate": "xgb_causal",
+        "model": "xgb",
+        "view": "causal",
+        "directory": "logs/benchmark_3w_binary/robustness_v1/fold_0/causal",
+        "validation": {
+          "auc": 0.8888062524321911,
+          "accuracy": 0.8159560485172715,
+          "anomaly_precision": 0.951086641553173,
+          "anomaly_recall": 0.8153434496855793,
+          "anomaly_f1": 0.8779993809208992,
+          "normal_f1": 0.6255088036223299,
+          "macro_f1": 0.7517540922716146,
+          "tp": 114877,
+          "fp": 5908,
+          "fn": 26017,
+          "tn": 26662,
+          "macro_f1_at_05": 0.7423162475296765,
+          "threshold_from_validation": 0.7755885124206543,
+          "instance_majority": {
+            "auc": 0.6773212969786293,
+            "accuracy": 0.6228373702422145,
+            "anomaly_precision": 0.9653846153846154,
+            "anomaly_recall": 0.5456521739130434,
+            "anomaly_f1": 0.6972222222222222,
+            "normal_f1": 0.4999999999999999,
+            "macro_f1": 0.598611111111111,
+            "tp": 251,
+            "fp": 9,
+            "fn": 209,
+            "tn": 109
+          }
+        },
+        "fit_seeds": [
+          42,
+          43,
+          44
+        ]
+      }
+    },
+    {
+      "fold": 1,
+      "candidates": [
+        {
+          "candidate": "xgb_window",
+          "model": "xgb",
+          "view": "window",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_1/window",
+          "validation": {
+            "auc": 0.7026968745426891,
+            "accuracy": 0.6133434026656828,
+            "anomaly_precision": 0.9242749916665709,
+            "anomaly_recall": 0.5707198319303873,
+            "anomaly_f1": 0.7056908285906105,
+            "normal_f1": 0.43654387365060693,
+            "macro_f1": 0.5711173511206087,
+            "tp": 80411,
+            "fp": 6588,
+            "fn": 60483,
+            "tn": 25982,
+            "macro_f1_at_05": 0.5547203669245095,
+            "threshold_from_validation": 0.981703519821167,
+            "instance_majority": {
+              "auc": 0.4399594694178335,
+              "accuracy": 0.43252595155709345,
+              "anomaly_precision": 0.8586956521739131,
+              "anomaly_recall": 0.34347826086956523,
+              "anomaly_f1": 0.49068322981366463,
+              "normal_f1": 0.35937500000000006,
+              "macro_f1": 0.4250291149068324,
+              "tp": 158,
+              "fp": 26,
+              "fn": 302,
+              "tn": 92
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "single_row_window",
+          "model": "single_row",
+          "view": "window",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_1/window",
+          "validation": {
+            "auc": 0.9127539566748984,
+            "accuracy": 0.8973792833095051,
+            "anomaly_precision": 0.935342175066313,
+            "anomaly_recall": 0.9385353528184309,
+            "anomaly_f1": 0.9369360432778662,
+            "normal_f1": 0.724694164772112,
+            "macro_f1": 0.8308151040249891,
+            "tp": 132234,
+            "fp": 9141,
+            "fn": 8660,
+            "tn": 23429,
+            "macro_f1_at_05": 0.8301889046090107,
+            "threshold_from_validation": 0.4822266101837158,
+            "instance_majority": {
+              "auc": 0.9111459100957996,
+              "accuracy": 0.842560553633218,
+              "anomaly_precision": 0.984251968503937,
+              "anomaly_recall": 0.8152173913043478,
+              "anomaly_f1": 0.8917954815695601,
+              "normal_f1": 0.7111111111111112,
+              "macro_f1": 0.8014532963403357,
+              "tp": 375,
+              "fp": 6,
+              "fn": 85,
+              "tn": 112
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "xgb_causal",
+          "model": "xgb",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_1/causal",
+          "validation": {
+            "auc": 0.86531125276824,
+            "accuracy": 0.793657473596827,
+            "anomaly_precision": 0.9394479148373933,
+            "anomaly_recall": 0.797351200193053,
+            "anomaly_f1": 0.8625867159096581,
+            "normal_f1": 0.5859735572752195,
+            "macro_f1": 0.7242801365924387,
+            "tp": 112342,
+            "fp": 7241,
+            "fn": 28552,
+            "tn": 25329,
+            "macro_f1_at_05": 0.6046045133686302,
+            "threshold_from_validation": 0.9574251770973206,
+            "instance_majority": {
+              "auc": 0.5376750184229919,
+              "accuracy": 0.39965397923875434,
+              "anomaly_precision": 0.900709219858156,
+              "anomaly_recall": 0.27608695652173915,
+              "anomaly_f1": 0.4226289517470882,
+              "normal_f1": 0.3747747747747748,
+              "macro_f1": 0.3987018632609315,
+              "tp": 127,
+              "fp": 14,
+              "fn": 333,
+              "tn": 104
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "single_row_causal",
+          "model": "single_row",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_1/causal",
+          "validation": {
+            "auc": 0.9289036068283449,
+            "accuracy": 0.8824482313333026,
+            "anomaly_precision": 0.9724385061121436,
+            "anomaly_recall": 0.8802220108734226,
+            "anomaly_f1": 0.9240352125531337,
+            "normal_f1": 0.7402453471930295,
+            "macro_f1": 0.8321402798730816,
+            "tp": 124018,
+            "fp": 3515,
+            "fn": 16876,
+            "tn": 29055,
+            "macro_f1_at_05": 0.7718232487006174,
+            "threshold_from_validation": 0.33454886078834534,
+            "instance_majority": {
+              "auc": 0.821831245394252,
+              "accuracy": 0.7006920415224913,
+              "anomaly_precision": 0.979933110367893,
+              "anomaly_recall": 0.6369565217391304,
+              "anomaly_f1": 0.7720685111989459,
+              "normal_f1": 0.5642317380352645,
+              "macro_f1": 0.6681501246171052,
+              "tp": 293,
+              "fp": 6,
+              "fn": 167,
+              "tn": 112
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "tabm_ple_causal",
+          "model": "tabm_ple",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_1/causal",
+          "validation": {
+            "auc": 0.8983757023589863,
+            "accuracy": 0.8333602361296869,
+            "anomaly_precision": 0.9539440616132955,
+            "anomaly_recall": 0.8351597654974662,
+            "anomaly_f1": 0.8906086798564963,
+            "normal_f1": 0.6504039475593827,
+            "macro_f1": 0.7705063137079395,
+            "tp": 117669,
+            "fp": 5681,
+            "fn": 23225,
+            "tn": 26889,
+            "macro_f1_at_05": 0.709045721232235,
+            "threshold_from_validation": 0.7552515864372253,
+            "instance_majority": {
+              "auc": 0.7487656595431098,
+              "accuracy": 0.6349480968858131,
+              "anomaly_precision": 0.9844357976653697,
+              "anomaly_recall": 0.55,
+              "anomaly_f1": 0.7057182705718271,
+              "normal_f1": 0.5193621867881548,
+              "macro_f1": 0.612540228679991,
+              "tp": 253,
+              "fp": 4,
+              "fn": 207,
+              "tn": 114
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        }
+      ],
+      "selected_neural": {
+        "candidate": "single_row_causal",
+        "model": "single_row",
+        "view": "causal",
+        "directory": "logs/benchmark_3w_binary/robustness_v1/fold_1/causal",
+        "validation": {
+          "auc": 0.9289036068283449,
+          "accuracy": 0.8824482313333026,
+          "anomaly_precision": 0.9724385061121436,
+          "anomaly_recall": 0.8802220108734226,
+          "anomaly_f1": 0.9240352125531337,
+          "normal_f1": 0.7402453471930295,
+          "macro_f1": 0.8321402798730816,
+          "tp": 124018,
+          "fp": 3515,
+          "fn": 16876,
+          "tn": 29055,
+          "macro_f1_at_05": 0.7718232487006174,
+          "threshold_from_validation": 0.33454886078834534,
+          "instance_majority": {
+            "auc": 0.821831245394252,
+            "accuracy": 0.7006920415224913,
+            "anomaly_precision": 0.979933110367893,
+            "anomaly_recall": 0.6369565217391304,
+            "anomaly_f1": 0.7720685111989459,
+            "normal_f1": 0.5642317380352645,
+            "macro_f1": 0.6681501246171052,
+            "tp": 293,
+            "fp": 6,
+            "fn": 167,
+            "tn": 112
+          }
+        },
+        "fit_seeds": [
+          42,
+          43,
+          44
+        ]
+      },
+      "selected_tree": {
+        "candidate": "xgb_causal",
+        "model": "xgb",
+        "view": "causal",
+        "directory": "logs/benchmark_3w_binary/robustness_v1/fold_1/causal",
+        "validation": {
+          "auc": 0.86531125276824,
+          "accuracy": 0.793657473596827,
+          "anomaly_precision": 0.9394479148373933,
+          "anomaly_recall": 0.797351200193053,
+          "anomaly_f1": 0.8625867159096581,
+          "normal_f1": 0.5859735572752195,
+          "macro_f1": 0.7242801365924387,
+          "tp": 112342,
+          "fp": 7241,
+          "fn": 28552,
+          "tn": 25329,
+          "macro_f1_at_05": 0.6046045133686302,
+          "threshold_from_validation": 0.9574251770973206,
+          "instance_majority": {
+            "auc": 0.5376750184229919,
+            "accuracy": 0.39965397923875434,
+            "anomaly_precision": 0.900709219858156,
+            "anomaly_recall": 0.27608695652173915,
+            "anomaly_f1": 0.4226289517470882,
+            "normal_f1": 0.3747747747747748,
+            "macro_f1": 0.3987018632609315,
+            "tp": 127,
+            "fp": 14,
+            "fn": 333,
+            "tn": 104
+          }
+        },
+        "fit_seeds": [
+          42,
+          43,
+          44
+        ]
+      }
+    },
+    {
+      "fold": 2,
+      "candidates": [
+        {
+          "candidate": "xgb_window",
+          "model": "xgb",
+          "view": "window",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_2/window",
+          "validation": {
+            "auc": 0.8868093181137501,
+            "accuracy": 0.8571461513628188,
+            "anomaly_precision": 0.9382189547417047,
+            "anomaly_recall": 0.8822164180163811,
+            "anomaly_f1": 0.9093562759256414,
+            "normal_f1": 0.6630863358259688,
+            "macro_f1": 0.7862213058758051,
+            "tp": 124299,
+            "fp": 8185,
+            "fn": 16595,
+            "tn": 24385,
+            "macro_f1_at_05": 0.7844900005999834,
+            "threshold_from_validation": 0.5109183192253113,
+            "instance_majority": {
+              "auc": 0.6901068533529846,
+              "accuracy": 0.7560553633217993,
+              "anomaly_precision": 0.9467787114845938,
+              "anomaly_recall": 0.7347826086956522,
+              "anomaly_f1": 0.8274173806609547,
+              "normal_f1": 0.584070796460177,
+              "macro_f1": 0.7057440885605659,
+              "tp": 338,
+              "fp": 19,
+              "fn": 122,
+              "tn": 99
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "single_row_window",
+          "model": "single_row",
+          "view": "window",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_2/window",
+          "validation": {
+            "auc": 0.910821997591859,
+            "accuracy": 0.9015011760365264,
+            "anomaly_precision": 0.9333436003696133,
+            "anomaly_recall": 0.9463142504294009,
+            "anomaly_f1": 0.9397841731689609,
+            "normal_f1": 0.7295748789212116,
+            "macro_f1": 0.8346795260450863,
+            "tp": 133330,
+            "fp": 9522,
+            "fn": 7564,
+            "tn": 23048,
+            "macro_f1_at_05": 0.81320074749529,
+            "threshold_from_validation": 0.3337397873401642,
+            "instance_majority": {
+              "auc": 0.8542925571112749,
+              "accuracy": 0.903114186851211,
+              "anomaly_precision": 0.963302752293578,
+              "anomaly_recall": 0.9130434782608695,
+              "anomaly_f1": 0.9375,
+              "normal_f1": 0.7846153846153846,
+              "macro_f1": 0.8610576923076922,
+              "tp": 420,
+              "fp": 16,
+              "fn": 40,
+              "tn": 102
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "xgb_causal",
+          "model": "xgb",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_2/causal",
+          "validation": {
+            "auc": 0.8985929486883484,
+            "accuracy": 0.8517329244108287,
+            "anomaly_precision": 0.9520744200651569,
+            "anomaly_recall": 0.8607889619146308,
+            "anomaly_f1": 0.9041333835298327,
+            "normal_f1": 0.6729901206626913,
+            "macro_f1": 0.788561752096262,
+            "tp": 121280,
+            "fp": 6105,
+            "fn": 19614,
+            "tn": 26465,
+            "macro_f1_at_05": 0.6862849075363625,
+            "threshold_from_validation": 0.9436666369438171,
+            "instance_majority": {
+              "auc": 0.6450810611643332,
+              "accuracy": 0.49653979238754326,
+              "anomaly_precision": 0.916256157635468,
+              "anomaly_recall": 0.4043478260869565,
+              "anomaly_f1": 0.5610859728506787,
+              "normal_f1": 0.40973630831643,
+              "macro_f1": 0.4854111405835544,
+              "tp": 186,
+              "fp": 17,
+              "fn": 274,
+              "tn": 101
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "single_row_causal",
+          "model": "single_row",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_2/causal",
+          "validation": {
+            "auc": 0.938078672356543,
+            "accuracy": 0.8810992482590048,
+            "anomaly_precision": 0.9619512195121951,
+            "anomaly_recall": 0.888767442190583,
+            "anomaly_f1": 0.9239123617971808,
+            "normal_f1": 0.7281140009754941,
+            "macro_f1": 0.8260131813863374,
+            "tp": 125222,
+            "fp": 4953,
+            "fn": 15672,
+            "tn": 27617,
+            "macro_f1_at_05": 0.8110101587119007,
+            "threshold_from_validation": 0.7044939994812012,
+            "instance_majority": {
+              "auc": 0.7608327192336035,
+              "accuracy": 0.698961937716263,
+              "anomaly_precision": 0.9554140127388535,
+              "anomaly_recall": 0.6521739130434783,
+              "anomaly_f1": 0.7751937984496124,
+              "normal_f1": 0.5445026178010471,
+              "macro_f1": 0.6598482081253298,
+              "tp": 300,
+              "fp": 14,
+              "fn": 160,
+              "tn": 104
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "tabm_ple_causal",
+          "model": "tabm_ple",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_2/causal",
+          "validation": {
+            "auc": 0.9227126028487093,
+            "accuracy": 0.8716160125443896,
+            "anomaly_precision": 0.975210716918245,
+            "anomaly_recall": 0.8638976819452922,
+            "anomaly_f1": 0.916185558474404,
+            "normal_f1": 0.7258132033192977,
+            "macro_f1": 0.8209993808968508,
+            "tp": 121718,
+            "fp": 3094,
+            "fn": 19176,
+            "tn": 29476,
+            "macro_f1_at_05": 0.7937640663246235,
+            "threshold_from_validation": 0.7037725448608398,
+            "instance_majority": {
+              "auc": 0.7177781871775978,
+              "accuracy": 0.6487889273356401,
+              "anomaly_precision": 0.9923371647509579,
+              "anomaly_recall": 0.5630434782608695,
+              "anomaly_f1": 0.7184466019417476,
+              "normal_f1": 0.5333333333333333,
+              "macro_f1": 0.6258899676375405,
+              "tp": 259,
+              "fp": 2,
+              "fn": 201,
+              "tn": 116
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        }
+      ],
+      "selected_neural": {
+        "candidate": "single_row_causal",
+        "model": "single_row",
+        "view": "causal",
+        "directory": "logs/benchmark_3w_binary/robustness_v1/fold_2/causal",
+        "validation": {
+          "auc": 0.938078672356543,
+          "accuracy": 0.8810992482590048,
+          "anomaly_precision": 0.9619512195121951,
+          "anomaly_recall": 0.888767442190583,
+          "anomaly_f1": 0.9239123617971808,
+          "normal_f1": 0.7281140009754941,
+          "macro_f1": 0.8260131813863374,
+          "tp": 125222,
+          "fp": 4953,
+          "fn": 15672,
+          "tn": 27617,
+          "macro_f1_at_05": 0.8110101587119007,
+          "threshold_from_validation": 0.7044939994812012,
+          "instance_majority": {
+            "auc": 0.7608327192336035,
+            "accuracy": 0.698961937716263,
+            "anomaly_precision": 0.9554140127388535,
+            "anomaly_recall": 0.6521739130434783,
+            "anomaly_f1": 0.7751937984496124,
+            "normal_f1": 0.5445026178010471,
+            "macro_f1": 0.6598482081253298,
+            "tp": 300,
+            "fp": 14,
+            "fn": 160,
+            "tn": 104
+          }
+        },
+        "fit_seeds": [
+          42,
+          43,
+          44
+        ]
+      },
+      "selected_tree": {
+        "candidate": "xgb_causal",
+        "model": "xgb",
+        "view": "causal",
+        "directory": "logs/benchmark_3w_binary/robustness_v1/fold_2/causal",
+        "validation": {
+          "auc": 0.8985929486883484,
+          "accuracy": 0.8517329244108287,
+          "anomaly_precision": 0.9520744200651569,
+          "anomaly_recall": 0.8607889619146308,
+          "anomaly_f1": 0.9041333835298327,
+          "normal_f1": 0.6729901206626913,
+          "macro_f1": 0.788561752096262,
+          "tp": 121280,
+          "fp": 6105,
+          "fn": 19614,
+          "tn": 26465,
+          "macro_f1_at_05": 0.6862849075363625,
+          "threshold_from_validation": 0.9436666369438171,
+          "instance_majority": {
+            "auc": 0.6450810611643332,
+            "accuracy": 0.49653979238754326,
+            "anomaly_precision": 0.916256157635468,
+            "anomaly_recall": 0.4043478260869565,
+            "anomaly_f1": 0.5610859728506787,
+            "normal_f1": 0.40973630831643,
+            "macro_f1": 0.4854111405835544,
+            "tp": 186,
+            "fp": 17,
+            "fn": 274,
+            "tn": 101
+          }
+        },
+        "fit_seeds": [
+          42,
+          43,
+          44
+        ]
+      }
+    },
+    {
+      "fold": 3,
+      "candidates": [
+        {
+          "candidate": "xgb_window",
+          "model": "xgb",
+          "view": "window",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_3/window",
+          "validation": {
+            "auc": 0.86240262327832,
+            "accuracy": 0.8547248996910022,
+            "anomaly_precision": 0.9342411458255139,
+            "anomaly_recall": 0.8833165358354508,
+            "anomaly_f1": 0.9080654340624863,
+            "normal_f1": 0.6539412249382038,
+            "macro_f1": 0.7810033295003451,
+            "tp": 124454,
+            "fp": 8760,
+            "fn": 16440,
+            "tn": 23810,
+            "macro_f1_at_05": 0.6499058785694116,
+            "threshold_from_validation": 0.7331320643424988,
+            "instance_majority": {
+              "auc": 0.820099484156227,
+              "accuracy": 0.8269896193771626,
+              "anomaly_precision": 0.9477611940298507,
+              "anomaly_recall": 0.8282608695652174,
+              "anomaly_f1": 0.8839907192575405,
+              "normal_f1": 0.6598639455782312,
+              "macro_f1": 0.7719273324178859,
+              "tp": 381,
+              "fp": 21,
+              "fn": 79,
+              "tn": 97
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "single_row_window",
+          "model": "single_row",
+          "view": "window",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_3/window",
+          "validation": {
+            "auc": 0.7594195393023382,
+            "accuracy": 0.676918553705668,
+            "anomaly_precision": 0.9327940261356565,
+            "anomaly_recall": 0.6489914403736142,
+            "anomaly_f1": 0.7654329255276849,
+            "normal_f1": 0.48111696464118064,
+            "macro_f1": 0.6232749450844328,
+            "tp": 91439,
+            "fp": 6588,
+            "fn": 49455,
+            "tn": 25982,
+            "macro_f1_at_05": 0.5683991007876518,
+            "threshold_from_validation": 0.9916753768920898,
+            "instance_majority": {
+              "auc": 0.5415438467207074,
+              "accuracy": 0.3079584775086505,
+              "anomaly_precision": 0.96875,
+              "anomaly_recall": 0.13478260869565217,
+              "anomaly_f1": 0.2366412213740458,
+              "normal_f1": 0.36708860759493667,
+              "macro_f1": 0.30186491448449126,
+              "tp": 62,
+              "fp": 2,
+              "fn": 398,
+              "tn": 116
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "xgb_causal",
+          "model": "xgb",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_3/causal",
+          "validation": {
+            "auc": 0.9233055775431904,
+            "accuracy": 0.863326108010884,
+            "anomaly_precision": 0.9598486869986972,
+            "anomaly_recall": 0.868042641986174,
+            "anomaly_f1": 0.9116401800888518,
+            "normal_f1": 0.6984328889793427,
+            "macro_f1": 0.8050365345340973,
+            "tp": 122302,
+            "fp": 5116,
+            "fn": 18592,
+            "tn": 27454,
+            "macro_f1_at_05": 0.8009157689838766,
+            "threshold_from_validation": 0.7093822360038757,
+            "instance_majority": {
+              "auc": 0.8576271186440678,
+              "accuracy": 0.7058823529411765,
+              "anomaly_precision": 0.9738562091503268,
+              "anomaly_recall": 0.6478260869565218,
+              "anomaly_f1": 0.7780678851174935,
+              "normal_f1": 0.5641025641025641,
+              "macro_f1": 0.6710852246100287,
+              "tp": 298,
+              "fp": 8,
+              "fn": 162,
+              "tn": 110
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "single_row_causal",
+          "model": "single_row",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_3/causal",
+          "validation": {
+            "auc": 0.923402283681896,
+            "accuracy": 0.8714603606512014,
+            "anomaly_precision": 0.9534807246698225,
+            "anomaly_recall": 0.8849205785909975,
+            "anomaly_f1": 0.9179222328156462,
+            "normal_f1": 0.7037770190378765,
+            "macro_f1": 0.8108496259267614,
+            "tp": 124680,
+            "fp": 6083,
+            "fn": 16214,
+            "tn": 26487,
+            "macro_f1_at_05": 0.7494106188345349,
+            "threshold_from_validation": 0.6585408449172974,
+            "instance_majority": {
+              "auc": 0.8349484156226972,
+              "accuracy": 0.6903114186851211,
+              "anomaly_precision": 0.9795221843003413,
+              "anomaly_recall": 0.6239130434782608,
+              "anomaly_f1": 0.7622841965471447,
+              "normal_f1": 0.5558312655086849,
+              "macro_f1": 0.6590577310279149,
+              "tp": 287,
+              "fp": 6,
+              "fn": 173,
+              "tn": 112
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        },
+        {
+          "candidate": "tabm_ple_causal",
+          "model": "tabm_ple",
+          "view": "causal",
+          "directory": "logs/benchmark_3w_binary/robustness_v1/fold_3/causal",
+          "validation": {
+            "auc": 0.9173843008965091,
+            "accuracy": 0.8697885440206613,
+            "anomaly_precision": 0.9563292164561942,
+            "anomaly_recall": 0.8798671341575937,
+            "anomaly_f1": 0.9165061750756867,
+            "normal_f1": 0.704377985733918,
+            "macro_f1": 0.8104420804048023,
+            "tp": 123968,
+            "fp": 5661,
+            "fn": 16926,
+            "tn": 26909,
+            "macro_f1_at_05": 0.6958217537328186,
+            "threshold_from_validation": 0.7381553649902344,
+            "instance_majority": {
+              "auc": 0.8661938098747237,
+              "accuracy": 0.7975778546712803,
+              "anomaly_precision": 0.9803921568627451,
+              "anomaly_recall": 0.7608695652173914,
+              "anomaly_f1": 0.8567931456548348,
+              "normal_f1": 0.654867256637168,
+              "macro_f1": 0.7558302011460014,
+              "tp": 350,
+              "fp": 7,
+              "fn": 110,
+              "tn": 111
+            }
+          },
+          "fit_seeds": [
+            42,
+            43,
+            44
+          ]
+        }
+      ],
+      "selected_neural": {
+        "candidate": "single_row_causal",
+        "model": "single_row",
+        "view": "causal",
+        "directory": "logs/benchmark_3w_binary/robustness_v1/fold_3/causal",
+        "validation": {
+          "auc": 0.923402283681896,
+          "accuracy": 0.8714603606512014,
+          "anomaly_precision": 0.9534807246698225,
+          "anomaly_recall": 0.8849205785909975,
+          "anomaly_f1": 0.9179222328156462,
+          "normal_f1": 0.7037770190378765,
+          "macro_f1": 0.8108496259267614,
+          "tp": 124680,
+          "fp": 6083,
+          "fn": 16214,
+          "tn": 26487,
+          "macro_f1_at_05": 0.7494106188345349,
+          "threshold_from_validation": 0.6585408449172974,
+          "instance_majority": {
+            "auc": 0.8349484156226972,
+            "accuracy": 0.6903114186851211,
+            "anomaly_precision": 0.9795221843003413,
+            "anomaly_recall": 0.6239130434782608,
+            "anomaly_f1": 0.7622841965471447,
+            "normal_f1": 0.5558312655086849,
+            "macro_f1": 0.6590577310279149,
+            "tp": 287,
+            "fp": 6,
+            "fn": 173,
+            "tn": 112
+          }
+        },
+        "fit_seeds": [
+          42,
+          43,
+          44
+        ]
+      },
+      "selected_tree": {
+        "candidate": "xgb_causal",
+        "model": "xgb",
+        "view": "causal",
+        "directory": "logs/benchmark_3w_binary/robustness_v1/fold_3/causal",
+        "validation": {
+          "auc": 0.9233055775431904,
+          "accuracy": 0.863326108010884,
+          "anomaly_precision": 0.9598486869986972,
+          "anomaly_recall": 0.868042641986174,
+          "anomaly_f1": 0.9116401800888518,
+          "normal_f1": 0.6984328889793427,
+          "macro_f1": 0.8050365345340973,
+          "tp": 122302,
+          "fp": 5116,
+          "fn": 18592,
+          "tn": 27454,
+          "macro_f1_at_05": 0.8009157689838766,
+          "threshold_from_validation": 0.7093822360038757,
+          "instance_majority": {
+            "auc": 0.8576271186440678,
+            "accuracy": 0.7058823529411765,
+            "anomaly_precision": 0.9738562091503268,
+            "anomaly_recall": 0.6478260869565218,
+            "anomaly_f1": 0.7780678851174935,
+            "normal_f1": 0.5641025641025641,
+            "macro_f1": 0.6710852246100287,
+            "tp": 298,
+            "fp": 8,
+            "fn": 162,
+            "tn": 110
+          }
+        },
+        "fit_seeds": [
+          42,
+          43,
+          44
+        ]
+      }
+    }
+  ],
+  "artifact_sha256": {
+    "docs/results/3w_grouped_robustness_v1/plan.json": "c041d4e3d39347366b680d82dc043bbce133cbb0fc0fce48cfc183ca639d74d2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/history_equivalence.json": "d7713eaefa42e7fd4ca5dea22d82079835f77b0732f48018ff6db25fd768e9be",
+    "examples/benchmark_3w_grouped.py": "a32b336b7dc36f05e89ee7c09ffe28401e67b841cfcb97098c9844fc113016a1",
+    "examples/benchmark_3w_context.py": "8107766b59e1c8320de81760a9bdc226757376c3a882bfb0018df6e8526851cb",
+    "examples/three_w_causal_features.py": "e102728ca14fbe475c1eb02ad6fcaaf9e032c24c7e8fa570b503bc5a0e96e8bd",
+    "utils/three_w.py": "7f4d6fb7f1b122f71bed62ac7f26f66ef2f9049b0088c63ac686b2475b3880f5",
+    "trea/models/single_row.py": "048821d9f3c627c58eb728fe29271ccacaefcc69f5380f18178c97a3bb1f7d9a",
+    "docs/results/3w_grouped_robustness_v1/fold_0.json": "24c7e280c818264510b888eefdb36ce6217d61ff5a9c6b3b2628133921e1818a",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/train_indices_42.npy": "0b64179eb6d518b4d243fc7172031cd6c551790e172d7ae4f14958202ed8444d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/train_indices_43.npy": "90c52ad465bfa98c176872736133404c2688aa2b6ff1d7de518e074369667a4b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/train_indices_44.npy": "f540e6e943303c0b699c7ea6a9d4c7eaf6b75f0242ad5882036790af00d2ba86",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/xgb_42_predictions.npz": "009d2b043e512cb855933027022b97a26255805cc3aed6b52ec3fb44792e5594",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/xgb_43_predictions.npz": "c3a9ac56f85f57f358162db5847499a050223ef6316cedf336db96bd40296ef6",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/xgb_44_predictions.npz": "a034eb4875b0e7ae45fad4db30139afaf0643dccdfa6e04266d2441cd6631b44",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/xgb_42.joblib": "d939b236791567f9b7c59b4d1b385138d86c5321d5b445eda57b823a3b91058a",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/xgb_43.joblib": "ee70b75b818d16ca4190fb965c864c6f8c622fcd5f11347dccf5d7064140a0c5",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/xgb_44.joblib": "662f44b422b8e80fdd787f4b0ba3eeb02a0f2e52e122e24612169912c0041185",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_42_predictions.npz": "42b33eda1accf0732dfafc9fcab0eb6da1e424de5dba35d1d0f88332e890724d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_43_predictions.npz": "b2b1e60a6349e18acee2ebd0546710cdf5d1dea7f4ceea496b48b96316b0e290",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_44_predictions.npz": "f7e40afae521f3380cc475cbe6f7c1ea9afcd299b88e4ccb247b767e3d74610e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_42.pt": "59ffab0000691f818bd80af319c7716a28c609bbe9064b56efcecc72a98233d9",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_42_preprocess.joblib": "f42d18cb39f6bff47c97129266a8cb7fefaf89f57652917c429d61c01720fdc0",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_43.pt": "5eedaa5e661b70e0b4ab250c97a6b09dcbb8fab4457f23193341729b00437904",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_43_preprocess.joblib": "704d7ecf78d9dc8c4a1ac3f8cf98440e0a83d2e0a9c44b866a2aa961d406cdee",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_44.pt": "d9973d82792f503a568b7479a0794d2e92f7f598143f5c519f611759f358c360",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/single_row_44_preprocess.joblib": "de034318228a609ad8930c3f65171caa783e2e6c8115b47aa71eb8388ac1f7ee",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/config.json": "b9009f2ff26ec9b49b73ac2c957fc57233a3bf705c377ea73d345596ed8b20c5",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/protocol.json": "925dc8c7a6e2d649fbb957b4fe672472607b6d81e513f19e91c77e3dc6250762",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/window/results.json": "e7b312857e10a1aa1b91ac53044b9a79c9af6422250f38a48dcac0bfc2d2c30c",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/train_indices_42.npy": "0b64179eb6d518b4d243fc7172031cd6c551790e172d7ae4f14958202ed8444d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/train_indices_43.npy": "90c52ad465bfa98c176872736133404c2688aa2b6ff1d7de518e074369667a4b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/train_indices_44.npy": "f540e6e943303c0b699c7ea6a9d4c7eaf6b75f0242ad5882036790af00d2ba86",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/xgb_42_predictions.npz": "f3cf8bb14d5b89bf57757a02b5f59c2864845801b5e1d17452d7e48a263d7480",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/xgb_43_predictions.npz": "df07563ae825745d09972d40956ffbc5f21ceb03cceeee32db3e24612ce2b820",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/xgb_44_predictions.npz": "08c6090708566263f66316f39a6aa0bacca51bf80b55cc1e91e37c8c4a19539f",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/xgb_42.joblib": "e097bfca225fe62f38aa177c5f5ceb628a1e6e3b8fb6751551c43aa4bf2c7a36",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/xgb_43.joblib": "e684f45de779f882fd319a486fd47e6cacfd05ef3b571ca820c4ed5d9fb9149b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/xgb_44.joblib": "323490938f70bb6d4305b929fd535d851c8bbea10a1a626c409879e86a4b0b8e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_42_predictions.npz": "d273b97852a56e3c0259584723d3dfca0ec261718202a86e5b4127ecf4e2e4c1",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_43_predictions.npz": "3a30ace71ab522bf1551f702c2a2d82e8e9b7e95d1788a07df865c4c7934b9a1",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_44_predictions.npz": "52ceb12fd2bfa8231a26c0b09ff620bfdd0a3a5ab3ace5d41601e2e1d4407cec",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_42.pt": "f39e1fc4b17298bb14716f3bb5fc1e8c545642f90c11f0d042ca3d9d7b4d324f",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_42_preprocess.joblib": "034c9ea07320379d388196ae9ba23020da8805102f0710afcb61d4fdff079fea",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_43.pt": "4ec943c13c7f5cc284a01dec039e21902de52c0fb6e8f6703904593cc5f1c974",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_43_preprocess.joblib": "ad824840a6fa4af29e08e8d427a2b9d507dee9bd13616d71da5f98ad56618b0e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_44.pt": "2928152b500500eb5db807096d85a98ffb9154e1cb0cfab51882d0733252d952",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/single_row_44_preprocess.joblib": "8d27e5f464a1677259acb24b1bad7ece1c58d83809c3f58f31f9facbcf21fb9a",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_42_predictions.npz": "7f88a389109a12b61954c5d0d73e70e06f88672ae00ff42fd786c4947556ea65",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_43_predictions.npz": "84505f424e055e6f5c14e64c62f7f1f0aab8b2560e757a4f8e14b65c8095a03c",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_44_predictions.npz": "af862afc754c94fdd5046f460c4ac2e469e6ce1a346f5f7737e626feb886f2e6",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_42.pt": "0755bfc688b2b3199b35e019c4658fa478532ea570025f7fa4ece6c4346ec0c5",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_42_preprocess.joblib": "034c9ea07320379d388196ae9ba23020da8805102f0710afcb61d4fdff079fea",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_43.pt": "7c7c3a31e52621a4095fa4d16857c098e3b4602044d375aff0b461723ee4697d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_43_preprocess.joblib": "ad824840a6fa4af29e08e8d427a2b9d507dee9bd13616d71da5f98ad56618b0e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_44.pt": "6e3518b014a96ca9212a031df7b4c387b09d07358feb4dba6e1ccbfafe6cf031",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/tabm_ple_44_preprocess.joblib": "8d27e5f464a1677259acb24b1bad7ece1c58d83809c3f58f31f9facbcf21fb9a",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/config.json": "239bfbbe0ae51505689e89424759fd5b1177f6d332f128d976ab8195479f8a4a",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/protocol.json": "925dc8c7a6e2d649fbb957b4fe672472607b6d81e513f19e91c77e3dc6250762",
+    "logs/benchmark_3w_binary/robustness_v1/fold_0/causal/results.json": "7da8ff30f137f49efe6fc8efd8aeab208d29b96961afc494a731a17360c30f07",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/history_equivalence.json": "f49e63688c932543380f2fa4e16f3deb15f04cb7743c76fe21099a900a1add04",
+    "docs/results/3w_grouped_robustness_v1/fold_1.json": "c9cd079382394ad86984dbb8380d064258a1f3d057447886018eeaae164da3aa",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/train_indices_42.npy": "f7662c35ee95c24c561740a535f08f059a03025a5fdce49130cee199be8c1492",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/train_indices_43.npy": "6865438cc5d3b4f829357586d2b68d443e9c5979276cf7ab6c057106a62a2ae4",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/train_indices_44.npy": "84ce413e6d8f8affdfa77563af7ee08f5815474f7303e089314e593f0c536fa6",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/xgb_42_predictions.npz": "1b4553bde15dc3eaa43057d4500d232b369c5d44796ac3482850946c36643e91",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/xgb_43_predictions.npz": "b83222950f1e1f36a1adc6912164e1233a9e32d93b9500126b7c05925b5eac7f",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/xgb_44_predictions.npz": "2531e9b37d095407e14c0465eff18e5afd9bd3503a9d12dc16e0644144f8b575",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/xgb_42.joblib": "6ae40d02c4bf13fab1240b9e086cdcd0aa20e72b3736888cc2d1c9d85f74947c",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/xgb_43.joblib": "63e9d5714d2f033990de0a1771e731d5677d610c66144c17c082de004b619b32",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/xgb_44.joblib": "edfe3cad9df1b42f41a35c66e1db23e69be85139e89ab522f456e77a06942640",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_42_predictions.npz": "15ecb9e8146639f7193c5eadb31e4fd0be78dd78dc2661b07a59ec37b27b8631",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_43_predictions.npz": "f03813374ba8273684025049ebfcecc315807af16b73d95d02ad70000936089d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_44_predictions.npz": "30721dc6013de25ebe53c4a57edc23e6e35821b8c859e994976b9ebb9450135b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_42.pt": "c39756420ec448799ff8f5fd385fe66ed97cf1cbaae2c7d07129a16435df2a9e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_42_preprocess.joblib": "8a9c37039e3a9024d586b2366594d416d2811b3d101269e584216d048f3c3be2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_43.pt": "4f113fa75ceea870b77a2b951b3fc76a138e13e747115ddf68f5fc72a39377ba",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_43_preprocess.joblib": "8b6b6bafacf3407dfe4dfa4553150039be9188207eb7a85d55a89b15939f20ca",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_44.pt": "c84cd7e96738c5b4ccd60451d149e3d49bbad95f4aa66d214df1cebd65f72db7",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/single_row_44_preprocess.joblib": "682fa795ab2b16e81eab9ef6b1ec22012e6c8b75cb35ebe82e39be4f6a01d00f",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/config.json": "f5c2e3c3ddf340ac109051c08eb6f24d9831d9d1285e694513c49f55d4969621",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/protocol.json": "622e48387cabfffc3ebcce5e5b7fe726067166b355607b45028817e8c2262c42",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/window/results.json": "f4256a562ce778d8e780374a6ec114ce177a8e01f0fc5b1b6ad45eb65be6d4ad",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/train_indices_42.npy": "f7662c35ee95c24c561740a535f08f059a03025a5fdce49130cee199be8c1492",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/train_indices_43.npy": "6865438cc5d3b4f829357586d2b68d443e9c5979276cf7ab6c057106a62a2ae4",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/train_indices_44.npy": "84ce413e6d8f8affdfa77563af7ee08f5815474f7303e089314e593f0c536fa6",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/xgb_42_predictions.npz": "e4f25e19571fa8f9e21c070fc2840315701009bc4b735596e51900f2829d8789",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/xgb_43_predictions.npz": "e035cfb76e5ae1a6c5dd0cdae7ed20a24556efb1f71b963a8864c080d3363252",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/xgb_44_predictions.npz": "1276de095eb3a33d09714c556dfa0f6ecfec3f4608a181481e4c3daef94a5083",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/xgb_42.joblib": "ba7756fa4baa678cba2e714f0205e143c8385ff924ec90e42c3768d80c883f6f",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/xgb_43.joblib": "a7c8472b2f319dcdd5bc616981c6652290cdd0b86ff83647819d43542e063a45",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/xgb_44.joblib": "af0e7b23edfcc8f07c9c867693b4a9af882b7d9a7f7af6dbdf0d814e45354777",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_42_predictions.npz": "c587e769ffda4a0904629a84b3f019af33ae305911c8fbbd61dca137c8b0b346",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_43_predictions.npz": "5cfafd7b7ee6227ed3e2d5fd6d1d16c902f004e40977d4abdeeb0bbf3669f7a2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_44_predictions.npz": "ead90b18c3c88c951734e285a4b8d7f8021a2af928471a82939d01d86c658f18",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_42.pt": "fae56fb487959e92836575d103e2e3d44656245455e230df3a5e889d51dd951c",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_42_preprocess.joblib": "b71ead26ee4f6b53f2bfa22ee2ebab7b12ffd0671d8bf5a20397fc211b96790a",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_43.pt": "6ea74ccc943f8ba3af965c43291c8f9ee8f09ebf1d56a7999747410c08ebe959",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_43_preprocess.joblib": "5a449bd439012a2d1c0d457f453fccee05a15c4b8d8352e6c65acd563d63c486",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_44.pt": "183cfc9e363a5dac21f88bd6f3ebab7e27b5543821054082738f777734fbe4e6",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/single_row_44_preprocess.joblib": "f1d93081ec5f3ceaa9e70f74ea36052c826f8241d7cc44eda5d82ea158de3f43",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_42_predictions.npz": "2709a8445e13a96fc4943f95c305dc42b096a3047452884818699f0e0fcfafa2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_43_predictions.npz": "fdd54568601cbba2d6ce620d8bd76e83975e5d2f20b518548fff91de254d09a9",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_44_predictions.npz": "d97639ffe7f328f680c73a9bc1d989f8c19984305b8eec08e07557ea896f4221",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_42.pt": "2d27b6df99cf74a82d90b00a7638ef46f5fce07720d5386d2ae1817fec13ca09",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_42_preprocess.joblib": "b71ead26ee4f6b53f2bfa22ee2ebab7b12ffd0671d8bf5a20397fc211b96790a",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_43.pt": "96e59ff428adc1f157874c5cd8191b9c262fbc4d3d2a262bc1bb8942b8c4f981",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_43_preprocess.joblib": "5a449bd439012a2d1c0d457f453fccee05a15c4b8d8352e6c65acd563d63c486",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_44.pt": "11dfdc28e656cc5b210bc90ddb8489ec56fb6d4e635a0e15388b4d7f2e060f22",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/tabm_ple_44_preprocess.joblib": "f1d93081ec5f3ceaa9e70f74ea36052c826f8241d7cc44eda5d82ea158de3f43",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/config.json": "c422e92b962a83f62e842b0363cb7a3cf17b9687153613058dd93d0a4dc19cd4",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/protocol.json": "622e48387cabfffc3ebcce5e5b7fe726067166b355607b45028817e8c2262c42",
+    "logs/benchmark_3w_binary/robustness_v1/fold_1/causal/results.json": "9f0a9759280f5844f892d7b4f77a968a92d787b5c6fb25b96f67a8318ba19068",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/history_equivalence.json": "6c0b28a5964dd2420dd497a221351db922ccd44fe527c92947269d3fe6143d6a",
+    "docs/results/3w_grouped_robustness_v1/fold_2.json": "db7f8da640a74f086f3dd505250eeb2e9c6c6ed1252843d5ec928ea2e6cd76fe",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/train_indices_42.npy": "836a7f5b79abb52add11be183beeaba6a3625620691b99f13ea3bbcf6b956b33",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/train_indices_43.npy": "3a2702a43e051d132f284285777cff6cce642e5000bc17bcc39efa7e2cd0371d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/train_indices_44.npy": "0c79421cbc9234c569cc00d0eae898ec2f2882dbc71353737837a0c2ca88c649",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/xgb_42_predictions.npz": "0a2a7fc7e9f1da62e85761acf0c51445465c3d4885d0433d32b480df6b1fcfcc",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/xgb_43_predictions.npz": "a580e3229b9cca6ec90e43c321a8bbd03905d99a4c73fea8cc31ac6bb916b47b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/xgb_44_predictions.npz": "5c132197717becffe78fb57095009240cfeb250fbd54de1e593fd0e3f97ecf8b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/xgb_42.joblib": "9256aad328cdc9509a5331988b0ddafc88d80d66f5a54420524c0aa652bf4630",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/xgb_43.joblib": "ecbe4653bbb67cd85503cc6bdc7eaa65be68bdf4eddb0e034278ab20bf5a7b1f",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/xgb_44.joblib": "06c045020e6c25d716d2567f380a34d4eff7664ede001abf0857cdcae7b13e70",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_42_predictions.npz": "e856a00b62abbd937dcdf0c8eeb35ecdf07cf0d5d6c4c45e269cc4736023151f",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_43_predictions.npz": "39655087fa866e3b3aaa0d89deeddacb056e869469034daaf804ab0469e439f3",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_44_predictions.npz": "801c9580a2c837d82d854f4791dbc71274e06aa075655fe77c389c373c729fbc",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_42.pt": "b70dfb86baf7aae31dd1110bf19ba9e2dc4eac99b781c20104b4e7b8cbfa5fc2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_42_preprocess.joblib": "82fefa44d072dffb6b2a74a9141be68bc8c86b0c3130cb9b76e64c4e8a1c97ba",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_43.pt": "497166d560922f1ee1e05aeab81f320e6fe102ad8fe191b2f202cafb1468075f",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_43_preprocess.joblib": "6bf793990c3f909285c41922601f86522b6067405739c5ef7418deac4ac126cf",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_44.pt": "46be49adc0d93361542cbe47b169f00751691bacd3e60edb740aac56763b7af5",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/single_row_44_preprocess.joblib": "7726dd8cc9ba6f93b71e78a1cc52dd60f851066ae218a0354e148b73ed6c99df",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/config.json": "0ef9ae7c8715a203450019c3d4239bfcf776b670d16d0345768f852dc73668b2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/protocol.json": "d0cbb11fefc17d472cf3cdb3863e9f68c99517d60259e5f897867bb1b54124d2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/window/results.json": "0ac3c97aed686cc6fa7c67cb0470ced8e8f3b19bfe419ba5143236b1de3383aa",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/train_indices_42.npy": "836a7f5b79abb52add11be183beeaba6a3625620691b99f13ea3bbcf6b956b33",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/train_indices_43.npy": "3a2702a43e051d132f284285777cff6cce642e5000bc17bcc39efa7e2cd0371d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/train_indices_44.npy": "0c79421cbc9234c569cc00d0eae898ec2f2882dbc71353737837a0c2ca88c649",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/xgb_42_predictions.npz": "453e621efa34c3b85f61f3170e09798531438382fb868d0481b187a752f800c8",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/xgb_43_predictions.npz": "ced0fb15087ac0b7f6aa2d5d435711a3a463e7ffd091dc46c36da23ebc539381",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/xgb_44_predictions.npz": "8eefe4b821dfc26f329d9bc2c4d881b6c7ad00d33bebbb184e5128305079357b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/xgb_42.joblib": "b9497ad7a292c9efdb6683c75d7815c937fe48b046aaf121be5bd6426373bc03",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/xgb_43.joblib": "a361305d3f8286374e3ee928adad4c13f86ef8eba09b7490c088d16173a161fc",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/xgb_44.joblib": "71b7812dcd9b2fb1a19276fc7d0d8b974652a0b7b1ed284bc4449c7262c0811b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_42_predictions.npz": "ebfb466f6e896f1b46fe2a61fb67e5fcd00c3052533133096e5cb88238adf133",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_43_predictions.npz": "ba0ae04d2eefaf601fb01971eefe9d4d02e78df5d54fb5a431ab3fc11063f9f2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_44_predictions.npz": "9c5c0aa913ec20eb282fea69251b6c30175328a6b077943ef7cb4cd07e07a15d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_42.pt": "cfe9a452c58e61af87e70e2ffb26b0bf8633c70f2e1d648ed208c5c99f8d88ba",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_42_preprocess.joblib": "5c715491ea5b1c61f142d45c319c20a7b8d3c072386654d75077fd996baf9b8e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_43.pt": "a09c680162d60f15af282025faed55117282ccd81844669296c1be41a24ee3b9",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_43_preprocess.joblib": "09ef031947461d3eb1b794e512dc17e7656f3062574a3c9f9094dcb1aa949f1c",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_44.pt": "74c418c885f10ebfc6bd42aa54820ce9fa4ddd918f1f21e46ac32f08a32daf91",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/single_row_44_preprocess.joblib": "cad45f16771f896539d150872265c8da8ab7546ccff64c868ac4f1d6d8ff7f63",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_42_predictions.npz": "92289c95b5792bd8e83a06bb1ada509647e60d7c59dcc8511fe70256f6c76260",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_43_predictions.npz": "36a431e277bec1dde9eeb2d388079983897aa0fc04ecec4a56db0da44e93a161",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_44_predictions.npz": "91e4626235301837de6bf01c5adc126d89734015830504094d0055d45dd609b1",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_42.pt": "fe76f2e7b3f011d56afaa63cbb4025e8718b21fec56d738d382fa6da41ac0d64",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_42_preprocess.joblib": "5c715491ea5b1c61f142d45c319c20a7b8d3c072386654d75077fd996baf9b8e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_43.pt": "25db6f4432d06a26b42e15d745591ebae5ef0338135d6b55fc59fd1b5c19f528",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_43_preprocess.joblib": "09ef031947461d3eb1b794e512dc17e7656f3062574a3c9f9094dcb1aa949f1c",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_44.pt": "ee8080c1e46c3d8961707c36ef269d34357840c807b149292f3b32ae78aa0629",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/tabm_ple_44_preprocess.joblib": "cad45f16771f896539d150872265c8da8ab7546ccff64c868ac4f1d6d8ff7f63",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/config.json": "b4a98f132a0fc7d62efcc91cf19fcb6f95f6f1185200e59cb15f22696754d457",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/protocol.json": "d0cbb11fefc17d472cf3cdb3863e9f68c99517d60259e5f897867bb1b54124d2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_2/causal/results.json": "0770d0e9f3a6784d3ecc90c67508a505fc507e454bd8eaafa87f2a3a2ba9c10b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/history_equivalence.json": "728656da19ebd812c180a2f6114c503880835b66a6eac99cc1c7ae2a660d7023",
+    "docs/results/3w_grouped_robustness_v1/fold_3.json": "0836d42ca0663097fff0f52548f3616d212fde0926a30c00cff5941769bfbdbf",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/train_indices_42.npy": "77a56eea143e077ae5eaf972934e17a123b9cf30a42afa039a350b163569bc81",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/train_indices_43.npy": "08ca20e6ec9c59a0237aaa2a45ebe3a1ff7faa6c928a8cad0ee37b9e27e42e17",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/train_indices_44.npy": "cb19106e34278fa878b67262887c297c8122829d5ba91f68494b1496038636b2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/xgb_42_predictions.npz": "3976fcfd7ba5f4739864784f478032b4b3f9cb458e792edb1932b8f8582d1b3d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/xgb_43_predictions.npz": "64ca5914b6046ef5a10a381eb84049a695c6f570886d5d74b7f846ea3b3059d4",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/xgb_44_predictions.npz": "290c1a6ed6f6c99ccfcf9c17c490db1167c904875f54234ad263b6d677a9a47b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/xgb_42.joblib": "4d1e85525c6ffe371fa557410ed5b9c8ae0bf78d51c0a11dbc5f86f6bf12d9da",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/xgb_43.joblib": "0d282e8a9a0dff49eb25f92330954ff131d34d97f05ff5cced186982031bacf3",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/xgb_44.joblib": "009601e11eb094839f1613fb87a08135c240d4d4f4fd4c35eed9ebd41bc0631d",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_42_predictions.npz": "56accdc262f107cbe7afd6db124336a2ea7d18c2fced89ec596a6477847c89fb",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_43_predictions.npz": "d05a98087ccdefc6f6b76c8dbedea6d365dd30fb70189702bfb4c72d5a254aca",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_44_predictions.npz": "289a8fc8d8e911ed1e2904bb25f8caf91b4d6714852fc1b1cd199639195b6de5",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_42.pt": "47b822b548f650ef1e5068dea215ecefbd162524f30534664c44cabccbf0c55c",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_42_preprocess.joblib": "8bc43b625865e5367ee5ef55d8edae4613c9e3c7a9d2e9b37c6cdae21e04733e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_43.pt": "40dc84c75cc5cfae5ea0c1f29b387691f1bbe0411513f0de0585381a89915366",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_43_preprocess.joblib": "3a6a412a23af233244852267e4b202e3d78b1c29afc839e71fd82fa158b8c6af",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_44.pt": "8ca8eccd6d2ada9f018dc620796677f452479fe3e37fab4763e2fc68e6e94449",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/single_row_44_preprocess.joblib": "8c7d56626bbe31a245fdd0847ab4fc03f74ac33d064c59b3c95afc39048878f2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/config.json": "74991aca26ea5fa61bcf91587515295a8d961c4267f2105f2520f668b862a4a9",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/protocol.json": "7d73ef892ccdff149d8da475cc9e1e5c15ed7e7a5f6ab7bff393883e5783ecb8",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/window/results.json": "5784ee1ce997e0c1557b86ef9fe2b49968761aa11fd6c64091b3c267e148116e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/train_indices_42.npy": "77a56eea143e077ae5eaf972934e17a123b9cf30a42afa039a350b163569bc81",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/train_indices_43.npy": "08ca20e6ec9c59a0237aaa2a45ebe3a1ff7faa6c928a8cad0ee37b9e27e42e17",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/train_indices_44.npy": "cb19106e34278fa878b67262887c297c8122829d5ba91f68494b1496038636b2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/xgb_42_predictions.npz": "7e37b3be1262b566627b03674f990b1ae407915a376ff34619de2eb7714e0b82",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/xgb_43_predictions.npz": "240f7018c33bf440ba841a69230ce2c6c70f126972db5b667541bb7861212f6c",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/xgb_44_predictions.npz": "8a37611e1126595d63291d1c09d5428da776a95b53456abeea9e7744bd938340",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/xgb_42.joblib": "7c59d20c2e9b0ba8714918d445ef73a9be611c7edf767154adb4a035a5a18aea",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/xgb_43.joblib": "cc52586946dc370915b703020f78af84c4e38e83eafa0afdd2a6794686c87d2e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/xgb_44.joblib": "f66b8b55730424efae29c8273eb39958fa9c3fbcff8058a427802458166337c4",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_42_predictions.npz": "899dc922a7fb3d2e8b259a40f10758d338d10ac0d932e901834c31e070a6e6b4",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_43_predictions.npz": "4288a9f63b24d0c7f683a2db6a4a86e0e7f0e871d3ae1f384d77445996dc66dd",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_44_predictions.npz": "2f102c0796bd485dd7d09c5dea5151653a1162d18183177fb18687cd6a3b0a30",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_42.pt": "aeb649f2dc2f527b187dde6069a8bc66d6bb569e5b451fe02e59d049855b5331",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_42_preprocess.joblib": "98e524efdacddc1f9f307d8a8fdfe1c95fd357dea16c59df8e78c5a772aea740",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_43.pt": "e75f7cbdbf345c4d14f9c8723edc041b8848b298064a7249109ef8266dac7223",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_43_preprocess.joblib": "54901979eb9b7f58a84fab5c32573ea9261e8020d30b115a7e7031042f1c5963",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_44.pt": "2f3eb9d37b08827d5ca04cc041b073492fa6d1a5df4489c14f9e5f7d57eeee87",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/single_row_44_preprocess.joblib": "d3f8bea855721b2567f8af6f1b9237144df880dbe08c67ac0e0b30759d5f7edd",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_42_predictions.npz": "069b89aee0e956f018910e37f22a5f4c915a2d955e05c5cb206b8721c353a9ac",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_43_predictions.npz": "d644f702f2394a3690635626ebe747080a8a19031144c16653c40728e8893962",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_44_predictions.npz": "26a2f2ba838ad1a444e5cc22ec4cf5af7964f85e649405a3db2fb666042c807e",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_42.pt": "54b74e03eb3efcaa1477b2cb6cf396241d9ede9e1d90d32ba39f2155df78732a",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_42_preprocess.joblib": "98e524efdacddc1f9f307d8a8fdfe1c95fd357dea16c59df8e78c5a772aea740",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_43.pt": "e70f41a160982e54c456d15738c34f36eb4ddc268add3623dcbcf13ff2b5995b",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_43_preprocess.joblib": "54901979eb9b7f58a84fab5c32573ea9261e8020d30b115a7e7031042f1c5963",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_44.pt": "fcba5c5218ca4febfceb3d3636446a894855dddb90406af5db08ac49ef7d0ff2",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/tabm_ple_44_preprocess.joblib": "d3f8bea855721b2567f8af6f1b9237144df880dbe08c67ac0e0b30759d5f7edd",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/config.json": "1c07758ae47112c5ce97121d6e49d7101cfb0bb8039e21c0831107452c4dc9b1",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/protocol.json": "7d73ef892ccdff149d8da475cc9e1e5c15ed7e7a5f6ab7bff393883e5783ecb8",
+    "logs/benchmark_3w_binary/robustness_v1/fold_3/causal/results.json": "474ba1ee356a1b879060b7542d1214feff388a5b3198e9447afdbf98d7f582d2",
+    "/home/kailukowiak/Work/TREA/examples/freeze_3w_robustness.py": "b701016b8a5d1b2893d2cb738962ce13b080d5329c85b143e5aadb2deeb58185",
+    "examples/three_w_label_blind_history.py": "f8f484fc9ad8de8222244f08947c3bdff0c7c9ce46dd097b75999dbb48cdb2c4",
+    "examples/evaluate_3w_robustness.py": "9f82a29d79d8b65712e72e6ba0774aa9f49bb96f80d8f4ef9301d23edeae1890"
+  },
+  "outer_groups_unread_at_freeze": true
+}

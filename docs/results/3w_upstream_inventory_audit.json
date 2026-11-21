@@ -1,0 +1,17 @@
+{
+  "scope": "Read-only public Git tree metadata comparison; no new sensor data downloaded or inspected.",
+  "upstream_repository": "https://github.com/petrobras/3W",
+  "upstream_tree_api": "https://api.github.com/repos/petrobras/3W/git/trees/main?recursive=1",
+  "upstream_tree_sha": "d717f0aadbe90b6dc6e15e29f6035e9630d22a5e",
+  "installed_head": "7bd55e166de9daf7b32223647cb8ba2c484891ce",
+  "installed_parquet_files": 2228,
+  "upstream_parquet_files": 2228,
+  "installed_physical_well_identifiers": 40,
+  "upstream_physical_well_identifiers": 40,
+  "new_physical_well_identifiers": [],
+  "new_parquet_paths": [],
+  "changed_parquet_git_object_ids": [],
+  "removed_parquet_paths": [],
+  "interpretation": "The checked upstream main tree does not provide additional independent physical wells or changed Parquet files beyond the installed dataset. No claim about private or future releases.",
+  "method": "Compared all recursive dataset/*.parquet paths and Git blob IDs with git ls-tree -r HEAD dataset in the installed clean 3W checkout; extracted WELL- followed by digits from file paths. GitHub API tree was not truncated."
+}

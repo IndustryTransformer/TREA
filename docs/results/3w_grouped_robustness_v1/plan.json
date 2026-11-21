@@ -1,0 +1,115 @@
+{
+  "parent_sha256": "2060da4a5cadfd2c0091d58c05f08e0e48a9372ad63b0c56dc9fe9141445eac4",
+  "scope": "Freeze four outer group folds within current training groups, without signals.\n\nThe current internal validation remains fixed for selection. Both consumed test\npartitions are excluded. This is a development-population robustness study with\nhistorical fitting exposure, not a newly acquired external confirmation cohort.\n",
+  "seeds_per_recipe": [
+    42,
+    43,
+    44
+  ],
+  "neural_candidates": [
+    "single_row_window",
+    "single_row_causal",
+    "tabm_ple_causal"
+  ],
+  "tree_candidates": [
+    "xgb_window",
+    "xgb_causal"
+  ],
+  "shared_recipe": {
+    "group_loss_power": 0.5,
+    "value_policy": "preserve_range",
+    "train_cap": 200000,
+    "width": 128,
+    "layers": 2,
+    "dropout": 0,
+    "lr": 0.0003,
+    "epochs": 30,
+    "patience": 6,
+    "causal_alpha": 0.1
+  },
+  "selection": "Within each outer fold select neural and tree recipes by highest three-fit ensemble AUC on fixed internal validation; no outer selection.",
+  "threshold": "Exact macro-F1 optimum on internal validation only.",
+  "unblinding": "Fit all candidates/all folds, save selection and hashes, then evaluate outer groups. No outer-driven refitting or threshold tuning.",
+  "reporting": [
+    "Each outer-fold AUC and macro-F1",
+    "Mean and spread across outer folds",
+    "Pooled out-of-fold per-window metrics",
+    "Single-fit and explicit three-fit ensembles separately",
+    "Physical-only and simulation-only results",
+    "Paired whole-group uncertainty and historical exposure"
+  ],
+  "fold_counts": [
+    {
+      "train": {
+        "groups": 411,
+        "physical_wells": 15
+      },
+      "val": {
+        "groups": 230,
+        "physical_wells": 8
+      },
+      "test": {
+        "groups": 138,
+        "physical_wells": 5
+      },
+      "excluded": {
+        "groups": 370,
+        "physical_wells": 12
+      }
+    },
+    {
+      "train": {
+        "groups": 412,
+        "physical_wells": 15
+      },
+      "val": {
+        "groups": 230,
+        "physical_wells": 8
+      },
+      "test": {
+        "groups": 137,
+        "physical_wells": 5
+      },
+      "excluded": {
+        "groups": 370,
+        "physical_wells": 12
+      }
+    },
+    {
+      "train": {
+        "groups": 412,
+        "physical_wells": 15
+      },
+      "val": {
+        "groups": 230,
+        "physical_wells": 8
+      },
+      "test": {
+        "groups": 137,
+        "physical_wells": 5
+      },
+      "excluded": {
+        "groups": 370,
+        "physical_wells": 12
+      }
+    },
+    {
+      "train": {
+        "groups": 412,
+        "physical_wells": 15
+      },
+      "val": {
+        "groups": 230,
+        "physical_wells": 8
+      },
+      "test": {
+        "groups": 137,
+        "physical_wells": 5
+      },
+      "excluded": {
+        "groups": 370,
+        "physical_wells": 12
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "protocol": {
+    "task": "3W binary normal-vs-fault",
+    "split_mode": "well",
+    "data_split_seed": 42,
+    "train_wells": 919,
+    "validation_wells": 230,
+    "train_windows": 644825,
+    "validation_windows": 110595,
+    "training_cap_per_seed": 200000,
+    "seeds": [42, 43, 44],
+    "primary_metric": "auc"
+  },
+  "configuration": {
+    "n_estimators": 500,
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "tree_method": "hist",
+    "naive_time_points_per_sensor": 12
+  },
+  "runs": [
+    {"model": "xgb_naive", "seed": 42, "auc": 0.9027681277300225, "macro_f1": 0.740781818817245, "train_seconds": 3.3023652289999745},
+    {"model": "xgb_naive", "seed": 43, "auc": 0.909766292587727, "macro_f1": 0.7496472998069794, "train_seconds": 3.111290421000035},
+    {"model": "xgb_naive", "seed": 44, "auc": 0.9078636818048913, "macro_f1": 0.7388113032320681, "train_seconds": 3.115620922000005},
+    {"model": "xgb_engineered", "seed": 42, "auc": 0.9494835097357726, "macro_f1": 0.8052826424252184, "train_seconds": 1.8706132320000393},
+    {"model": "xgb_engineered", "seed": 43, "auc": 0.9482337560008232, "macro_f1": 0.7944192148482188, "train_seconds": 1.8883055759999934},
+    {"model": "xgb_engineered", "seed": 44, "auc": 0.9445694616594742, "macro_f1": 0.7942833143642727, "train_seconds": 1.9898539850000247}
+  ],
+  "summary": {
+    "xgb_naive": {"auc_mean": 0.9067993673742135, "auc_sd": 0.002954448820498147, "macro_f1_mean": 0.7430801406187642, "macro_f1_sd": 0.00471284894519766},
+    "xgb_engineered": {"auc_mean": 0.9474289091320234, "auc_sd": 0.002085313882961124, "macro_f1_mean": 0.79799505721257, "macro_f1_sd": 0.005153399584034701}
+  }
+}
