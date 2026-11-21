@@ -1,7 +1,7 @@
 # Real-NOx SSL replication — pre-registration and run plan (2026-11-21)
 
-**Status: pre-registered, not run.** Nothing below has been fit on real data.
-Lock this file before the first fit. Do not edit the criteria after any result exists.
+**Status: run 2026-11-21. Verdict: REPLICATED** (see Results at the end).
+The criteria below were locked before the first fit and are unchanged.
 
 ## Question
 
@@ -164,3 +164,53 @@ are not reused by the full run.
 
 **After the run.** Append the verdict and the per-fraction table to LESSONS §3h and
 to this file. Copy `summary.json` to `docs/results/nox_ssl_replication.json`.
+
+## Results (2026-11-21)
+
+Run on Kai's pop-os machine: 750 jobs, 16 workers × 2 CPU threads, about 28 minutes
+wall-clock, no failed jobs. `admissible: true` (frozen recipe). XGBoost was supplied
+with `uv run --with xgboost==3.3.0`, because `pyproject.toml` does not declare it.
+Compact artifacts: `results/nox_ssl_replication/` (summary, protocol, provenance).
+
+**Reproduction cell.** All 19 draw-42 / SSL-42 ensemble RMSEs match the original
+diagnostic exactly (difference 0.000), for example `pre` @1% = 11.895 and
+`scratch` @1% = 12.453.
+
+**Primary verdict: REPLICATED (3/3 low fractions pass).** `pre` vs `scratch`,
+three-init ensemble future RMSE, mean over 5 fresh draws × 3 SSL seeds:
+
+| Labels | Mean Δ (RMSE) | Relative | Draws improved | Δ vs random encoder | Draw bootstrap 95% CI | SD between draws | SD over SSL seeds |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |
+| 1% | −0.983 | −7.29% | 4/5 | −1.116 | [−1.617, −0.300] | 0.888 | 0.863 |
+| 2% | −0.816 | −6.31% | 5/5 | −1.127 | [−1.061, −0.605] | 0.295 | 1.029 |
+| 5% | −0.637 | −4.78% | 4/5 | −0.907 | [−1.567, +0.115] | 1.087 | 0.868 |
+
+**Secondary, transductive `pre_target`: also passes 3/3.** Δ = −0.419 / −0.685 /
+−0.510 (−2.85% / −5.22% / −3.84%), draws improved 4/5, 5/5, 4/5; vs random
+−0.552 / −0.996 / −0.781. Smaller than source-only SSL at every low fraction.
+
+**10% labels (descriptive).** `pre` Δ = +0.086 (1/5 draws improved);
+`pre_target` Δ = −0.028 (3/5). The benefit is gone at 10%, consistent with the
+original reversal. Note that the adaptation mode also changes at 10%.
+
+**Means over draws (ensemble RMSE).**
+
+| Labels | xgb | xgb_all | scratch | pre | pre_target | random |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1% | 12.49 | 12.87 | 12.84 | **11.86** | 12.42 | 12.98 |
+| 2% | 12.86 | 13.07 | 12.79 | **11.98** | 12.11 | 13.11 |
+| 5% | 12.95 | 12.62 | 12.37 | **11.74** | 11.86 | 12.64 |
+| 10% | 13.12 | 12.43 | 12.17 | 12.25 | **12.14** | — |
+
+**Reading.**
+
+- The §3h low-label SSL benefit is real on this dataset. It is larger on fresh draws
+  than in the original single-draw cell, so that cell was not a lucky draw.
+- The effect is not uniform. At 5% the draw-level CI crosses zero, and SSL-seed
+  spread (about 0.9–1.0 RMSE) is as large as draw spread. Report ensembles, never
+  single SSL seeds.
+- Source-only SSL also has the lowest mean RMSE of every arm, trees included, at
+  1/2/5%. This was not a gating criterion.
+- Scope: one dataset, one temporal split, three-init ensembles. This licenses
+  scaling real-sensor pretraining. It does not reopen the killed §3 deep-vs-trees
+  gates.
