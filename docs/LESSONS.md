@@ -380,6 +380,9 @@ gate**: corrected feature/fit-row fairness, different optimization, one label dr
 one SSL seed per arm, and a low-label adaptation-mode change. Seed variance remains
 large, and ensemble gains must not be presented as single-fit results. Freeze the
 recipe and replicate across label draws/SSL seeds before scaling pretraining.
+That replication is pre-registered in `NOX_SSL_REPLICATION.md` (5 fresh label
+draws × 3 SSL seeds, recipe frozen; runner `scripts/nox_ssl_replication.py`).
+Not yet run as of 2026-11-21.
 The real-sensor SSL finding does not rehabilitate the unrelated synthetic
 random-function prior. Full protocol, additional controls, baseline correction,
 and verified predictions: `NOX_TEMPORAL_PRETRAINING.md`.
