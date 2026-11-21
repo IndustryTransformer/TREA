@@ -1,0 +1,131 @@
+{
+  "run": "2026-11-21, commit 89c0048, pop-os",
+  "verdict": "PASS 5/5 (need 4)",
+  "rows": [
+    {
+      "held_out": "california_housing",
+      "xgb": 0.6791460660996531,
+      "transfer_index": 1.1509424031607898,
+      "scratch_semantic": 0.8502411715375223,
+      "scratch_index": 1.1509625475356058,
+      "transfer_semantic": 0.8028744390666988,
+      "xgb_std": 0.01806317887467851,
+      "transfer_index_std": 0.010861990237626327,
+      "scratch_semantic_std": 0.03896172283503706,
+      "scratch_index_std": 0.01606382495279277,
+      "transfer_semantic_std": 0.03567250395794421,
+      "n_fits": {
+        "xgb": 3,
+        "transfer_index": 9,
+        "scratch_semantic": 3,
+        "scratch_index": 3,
+        "transfer_semantic": 9
+      },
+      "beats": {
+        "transfer_index": true,
+        "scratch_semantic": true,
+        "scratch_index": true
+      }
+    },
+    {
+      "held_out": "concrete_compressive_strength",
+      "xgb": 6.9184480227430365,
+      "transfer_index": 14.709876222412017,
+      "scratch_semantic": 11.372601459163924,
+      "scratch_index": 14.762141713631602,
+      "transfer_semantic": 9.741294105565533,
+      "xgb_std": 0.11847046124929211,
+      "transfer_index_std": 0.2694579894941715,
+      "scratch_semantic_std": 1.3313709108557326,
+      "scratch_index_std": 0.35090433671430604,
+      "transfer_semantic_std": 2.328729258311787,
+      "n_fits": {
+        "xgb": 3,
+        "transfer_index": 9,
+        "scratch_semantic": 3,
+        "scratch_index": 3,
+        "transfer_semantic": 9
+      },
+      "beats": {
+        "transfer_index": true,
+        "scratch_semantic": true,
+        "scratch_index": true
+      }
+    },
+    {
+      "held_out": "abalone",
+      "xgb": 2.4505656485937863,
+      "transfer_index": 2.616347433658614,
+      "scratch_semantic": 2.5801705875423253,
+      "scratch_index": 2.581581740279076,
+      "transfer_semantic": 2.4634806514571412,
+      "xgb_std": 0.026779625737712157,
+      "transfer_index_std": 0.04174733280911437,
+      "scratch_semantic_std": 0.02787531189108233,
+      "scratch_index_std": 0.016260753106730214,
+      "transfer_semantic_std": 0.09366228526406106,
+      "n_fits": {
+        "xgb": 3,
+        "transfer_index": 9,
+        "scratch_semantic": 3,
+        "scratch_index": 3,
+        "transfer_semantic": 9
+      },
+      "beats": {
+        "transfer_index": true,
+        "scratch_semantic": true,
+        "scratch_index": true
+      }
+    },
+    {
+      "held_out": "airfoil_self_noise",
+      "xgb": 3.14400489306151,
+      "transfer_index": 6.216204102605512,
+      "scratch_semantic": 4.620176127000338,
+      "scratch_index": 6.264689271626966,
+      "transfer_semantic": 4.229105456075261,
+      "xgb_std": 0.1610176209889988,
+      "transfer_index_std": 0.13406788377679354,
+      "scratch_semantic_std": 0.22185270807443858,
+      "scratch_index_std": 0.1461012330269509,
+      "transfer_semantic_std": 0.27656682381356074,
+      "n_fits": {
+        "xgb": 3,
+        "transfer_index": 9,
+        "scratch_semantic": 3,
+        "scratch_index": 3,
+        "transfer_semantic": 9
+      },
+      "beats": {
+        "transfer_index": true,
+        "scratch_semantic": true,
+        "scratch_index": true
+      }
+    },
+    {
+      "held_out": "Bike_Sharing_Demand",
+      "xgb": 104.93202289311044,
+      "transfer_index": 162.66330338186174,
+      "scratch_semantic": 143.21233902851017,
+      "scratch_index": 162.24615017518855,
+      "transfer_semantic": 133.12992412707686,
+      "xgb_std": 1.871944668256421,
+      "transfer_index_std": 2.2027517282376343,
+      "scratch_semantic_std": 7.214684819560613,
+      "scratch_index_std": 3.2951141606293888,
+      "transfer_semantic_std": 8.084686308127306,
+      "n_fits": {
+        "xgb": 3,
+        "transfer_index": 9,
+        "scratch_semantic": 3,
+        "scratch_index": 3,
+        "transfer_semantic": 9
+      },
+      "beats": {
+        "transfer_index": true,
+        "scratch_semantic": true,
+        "scratch_index": true
+      }
+    }
+  ]
+}
