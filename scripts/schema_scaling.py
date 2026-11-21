@@ -1,50 +1,45 @@
-"""Schema-scaling: does semantic column transfer improve with the NUMBER of
-pretraining schemas? This is the honest test the single A->B pair could not reach.
+"""Release gate for trea.transfer: does column-name transfer beat every control?
 
-Thesis (Kai): semantic column embeddings are a *meta-learning* bet -- the projection
-"column-description -> predictive role" only becomes reusable if fit across MANY
-column vocabularies. One source schema has nothing to generalize; the payoff (if any)
-shows up as a SLOPE: transfer to a held-out dataset should improve as K (# pretraining
-datasets) grows, and semantic should pull ahead of an index embedder that cannot cross
-vocabularies.
+This re-runs the schema-scaling test (docs/LESSONS.md §3b) through the shipped API,
+``trea.transfer.SchemaTransferRegressor``, so the gate tests the code users get
+rather than a script-local copy. It adds the arm §3b lacked: ``scratch_index``
+(§3g found it beats ``scratch_semantic`` on 4/5 held-outs at 200 labels).
 
 Setup (corpus from scripts/download_tabular_corpus.py):
-  - One SHARED encoder (semantic embedder proj + numeric value projection + attention +
-    pooling) with a per-dataset regression head. For all-numeric datasets every shared
-    weight is schema-independent, so the same encoder consumes any schema by swapping
-    the column descriptions -- variable-width transfer for free.
-  - Pretrain the shared encoder on K source datasets (round-robin, each standardized on
-    its own train). Then few-shot fine-tune on a held-out dataset (unseen columns) and
-    measure test RMSE (held-out's own units).
+  - Each dataset is split 70/30 train/test (fixed, random_state=42).
+  - Source tables for pretraining = the train split of K datasets drawn from the
+    pool that excludes the held-out dataset.
+  - Few-shot = n_labels rows sampled from the held-out train split. Every deep arm
+    standardizes on those labeled rows only (the API's behaviour; §3b used the full
+    train split, which leaked target scale).
+  - Metric = held-out test RMSE in original units, mean over fits.
 
-Arms (held-out test RMSE):
-  transfer_semantic : shared encoder pretrained on K sources (semantic embedder) ->
-                      held-out
-  transfer_index    : same, but an index embedder whose vocab = source column names only
-                      (held-out's columns are unseen -> [UNK]: the honest floor)
-  scratch_semantic  : semantic model trained on the held-out few-shot labels only
-                      (K-independent)
-  xgb               : XGBoost on the held-out few-shot labels (the tree bar; no
-                      transfer)
+Arms:
+  transfer_semantic : pretrain on K sources (semantic embedder), fit on held-out
+  transfer_index    : same with embedder="index" (unseen columns -> [UNK])
+  scratch_semantic  : fit on held-out only, semantic embedder
+  scratch_index     : fit on held-out only, index embedder
+  xgb               : XGBoost on the same labels (reported, not gated)
 
-== PRE-REGISTERED signal (locked before results) ==
-Semantic column transfer is VALIDATED iff, on average over held-out datasets:
-  (1) transfer_semantic test-RMSE DECREASES as K grows (a real schema-scaling slope),
-      AND
-  (2) at the largest K, transfer_semantic < transfer_index (the gain is name-semantics,
-      not just the shared numeric/attention backbone), AND
-  (3) at the largest K, transfer_semantic < scratch_semantic (pretraining helped at
-      all).
-KILL if the slope is flat OR transfer_index >= transfer_semantic at large K -> tabular
-column-name semantics carry no transferable signal even across many schemas.
+Fits: transfer arms = source_seeds x fewshot_seeds (each pretrained model is
+fine-tuned once per few-shot draw); scratch arms and xgb = fewshot_seeds.
 
-Run (trains many models; progress off; ask before running):
-    uv run python scripts/schema_scaling.py
+== PRE-REGISTERED GATE (locked 2026-11-21, before any run; do not revise) ==
+At K=4, n_labels=200, 3 source seeds, 3 few-shot seeds, on the 5 held-outs below:
+PASS iff, on at least 4 of 5 held-outs, transfer_semantic has lower mean RMSE
+than ALL THREE of transfer_index, scratch_semantic and scratch_index.
+FAIL against scratch_index only -> the mechanism is real but has no user value at
+200 labels: do not ship the class as a feature; record the result and stop.
+
+Run (trains many small models; progress off):
+    uv run python scripts/schema_scaling.py > /tmp/schema_gate.log 2>&1
     uv run python scripts/schema_scaling.py --smoke
 """
 
 import argparse
+import copy
 import json
+import math
 import os
 import warnings
 
@@ -52,200 +47,64 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
 
-from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, TensorDataset
 from xgboost import XGBRegressor
 
 
 warnings.filterwarnings("ignore")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-torch.set_float32_matmul_precision("medium")
 
-from trea.models.column_embeddings import (  # noqa: E402
-    IndexColumnEmbedder,
-    SemanticColumnEmbedder,
-)
-from trea.models.single_row import AttentionPooling, TabularEncoder  # noqa: E402
-from trea.utils.single_row_data import SingleRowConfig  # noqa: E402
+from trea.transfer import SchemaTransferRegressor, Table  # noqa: E402
 
 
-CORPUS = Path(__file__).resolve().parent.parent / "data" / "tabular_corpus"
-DEV = "cuda" if torch.cuda.is_available() else "cpu"
-D_MODEL, N_HEADS, N_LAYERS, DROPOUT, BATCH = 128, 4, 3, 0.1, 256
-RESULTS = Path(__file__).resolve().parent.parent / "schema_scaling_results.json"
+ROOT = Path(__file__).resolve().parent.parent
+CORPUS = ROOT / "data" / "tabular_corpus"
+RESULTS = ROOT / "logs" / "schema_transfer_gate.json"
+TARGET = "__target__"
+HELD_OUT = [
+    "california_housing",
+    "concrete_compressive_strength",
+    "abalone",
+    "airfoil_self_noise",
+    "Bike_Sharing_Demand",
+]
+GATED = ("transfer_index", "scratch_semantic", "scratch_index")
 
 
-# --------------------------------------------------------------------------- data
 def load_corpus():
     manifest = json.loads((CORPUS / "manifest.json").read_text())
-    out = []
+    out = {}
     for m in manifest:
         df = pd.read_parquet(CORPUS / f"{m['name']}.parquet")
         feat = m["feature_cols"]
-        descr = [m["descriptions"][c] for c in feat]  # cleaned names, in column order
-        out.append({"name": m["name"], "df": df, "feat": feat, "descr": descr})
+        df = df[feat + [TARGET]]
+        tr, te = train_test_split(df, test_size=0.3, random_state=42)
+        out[m["name"]] = {
+            "train": tr.reset_index(drop=True),
+            "test": te.reset_index(drop=True),
+            "descr": {c: m["descriptions"][c] for c in feat},
+        }
     return out
 
 
-def standardize(train, other, feat):
-    mu, sd = train[feat].mean(), train[feat].std().replace(0, 1)
-    tmu, tsd = train["__target__"].mean(), train["__target__"].std() or 1.0
-
-    def sc(d):
-        X = ((d[feat] - mu) / sd).to_numpy(np.float32)
-        # Tame outliers to avoid attention-logit overflow (clip preserves NaN, which the
-        # model treats as missing natively -- no sentinel conversion needed here).
-        X = np.clip(X, -8.0, 8.0)
-        y = ((d["__target__"] - tmu) / tsd).to_numpy(np.float32)
-        return X, y
-
-    return sc(train), sc(other), float(tsd)
+def table(d, df, name):
+    return Table(df, TARGET, d["descr"], name=name)
 
 
-def tensors(X, y):
-    return TensorDataset(torch.from_numpy(X), torch.from_numpy(y).unsqueeze(1))
+def rmse(pred, y):
+    return float(np.sqrt(np.mean((np.asarray(pred) - np.asarray(y)) ** 2)))
 
 
-# -------------------------------------------------------------------------- model
-def head(d_model, dropout):
-    return nn.Sequential(
-        nn.Linear(d_model, 2 * d_model),
-        nn.GELU(),
-        nn.Dropout(dropout),
-        nn.Linear(2 * d_model, 1),
-    )
-
-
-class SharedModel(nn.Module):
-    """One shared encoder (+ embedder, pooling) with a per-dataset regression head.
-
-    The encoder is built from a dummy config -- its schema-dependent parts (the value/
-    mask embedding table and index buffers) are unused for all-numeric inputs with a
-    plug-in col_embedder, so forward works for ANY schema by setting the column
-    descriptions per batch.
-    """
-
-    def __init__(self, embedder, head_names):
-        super().__init__()
-        dummy = SingleRowConfig.generate(
-            pd.DataFrame({"a": [0.0, 1.0], "b": [1.0, 0.0], "__t__": [0.0, 1.0]}),
-            target="__t__",
-        )
-        self.encoder = TabularEncoder(
-            dummy, D_MODEL, N_HEADS, N_LAYERS, DROPOUT, col_embedder=embedder
-        )
-        self.pooling = AttentionPooling(D_MODEL)
-        self.drop = nn.Dropout(DROPOUT)
-        self.heads = nn.ModuleDict({n: head(D_MODEL, DROPOUT) for n in head_names})
-
-    def forward(self, name, num, descr):
-        self.encoder.col_texts = descr
-        self.encoder.numeric_texts = descr
-        h = self.encoder(num, None)
-        return self.heads[name](self.drop(self.pooling(h)))
-
-
-# ------------------------------------------------------------------------ training
-def loaders_for(datasets, splits):
-    out = {}
-    for ds in datasets:
-        (Xtr, ytr), _, _ = splits[ds["name"]]
-        out[ds["name"]] = DataLoader(
-            tensors(Xtr, ytr), batch_size=BATCH, shuffle=True, drop_last=False
-        )
-    return out
-
-
-def pretrain(model, sources, splits, descrs, epochs, lr):
-    model.to(DEV).train()
-    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    lossf = nn.MSELoss()
-    loaders = loaders_for(sources, splits)
-    names = [ds["name"] for ds in sources]
-    for _ in range(epochs):
-        iters = {n: iter(loaders[n]) for n in names}
-        active = list(names)
-        while active:
-            for n in list(active):
-                try:
-                    X, y = next(iters[n])
-                except StopIteration:
-                    active.remove(n)
-                    continue
-                X, y = X.to(DEV), y.to(DEV)
-                loss = lossf(model(n, X, descrs[n]), y)
-                opt.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                opt.step()
-    return model
-
-
-@torch.no_grad()
-def eval_rmse(model, name, X, y, descr, tscale):
-    model.eval()
-    preds = []
-    for i in range(0, len(X), 4096):
-        xb = torch.from_numpy(X[i : i + 4096]).to(DEV)
-        preds.append(model(name, xb, descr).cpu().numpy())
-    p = np.concatenate(preds).ravel()
-    return float(np.sqrt(mean_squared_error(y, p))) * tscale
-
-
-def finetune_heldout(model, held, splits, descrs, n_labels, epochs, lr, tscale, seed):
-    """Fine-tune the (possibly pretrained) model on n_labels of held-out.
-
-    Reports best-val test RMSE.
-    """
-    name = held["name"]
-    (Xtr, ytr), (Xte, yte), _ = splits[name]
+def fewshot_rows(d, n_labels, seed):
     rng = np.random.RandomState(seed)
-    idx = rng.choice(len(Xtr), size=min(n_labels, len(Xtr)), replace=False)
-    Xs, ys = Xtr[idx], ytr[idx]
-    fit_i, val_i = train_test_split(
-        np.arange(len(Xs)), test_size=0.25, random_state=seed
-    )
-    loader = DataLoader(
-        tensors(Xs[fit_i], ys[fit_i]), batch_size=min(BATCH, len(fit_i)), shuffle=True
-    )
-    model.to(DEV)
-    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    lossf = nn.MSELoss()
-    best_val, best_state, patience, bad = np.inf, None, 10, 0
-    for _ in range(epochs):
-        model.train()
-        for X, y in loader:
-            X, y = X.to(DEV), y.to(DEV)
-            loss = lossf(model(name, X, descrs[name]), y)
-            opt.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
-        val = eval_rmse(model, name, Xs[val_i], ys[val_i], descrs[name], 1.0)
-        if val < best_val - 1e-4:
-            best_val, bad = val, 0
-            best_state = {
-                k: v.detach().cpu().clone() for k, v in model.state_dict().items()
-            }
-        else:
-            bad += 1
-            if bad >= patience:
-                break
-    if best_state is not None:
-        model.load_state_dict(best_state)
-    return eval_rmse(model, name, Xte, yte, descrs[name], tscale)
+    n = min(n_labels, len(d["train"]))
+    return d["train"].iloc[rng.choice(len(d["train"]), size=n, replace=False)]
 
 
-def xgb_rmse(held, splits, n_labels, tscale, seed):
-    name = held["name"]
-    (Xtr, ytr), (Xte, yte), _ = splits[name]
-    rng = np.random.RandomState(seed)
-    idx = rng.choice(len(Xtr), size=min(n_labels, len(Xtr)), replace=False)
+def xgb_rmse(d, rows, seed):
+    feat = list(d["descr"])
     m = XGBRegressor(
         n_estimators=400,
         max_depth=6,
@@ -255,184 +114,120 @@ def xgb_rmse(held, splits, n_labels, tscale, seed):
         n_jobs=-1,
         random_state=seed,
     )
-    m.fit(Xtr[idx], ytr[idx])
-    return float(np.sqrt(mean_squared_error(yte, m.predict(Xte)))) * tscale
+    m.fit(rows[feat], rows[TARGET])
+    return rmse(m.predict(d["test"][feat]), d["test"][TARGET])
 
 
-# ---------------------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--n-labels", type=int, default=200)
-    ap.add_argument(
-        "--held-out",
-        nargs="+",
-        default=["california_housing", "concrete_compressive_strength", "abalone"],
-    )
-    ap.add_argument("--k-values", type=int, nargs="+", default=[1, 2, 4, 8])
-    ap.add_argument("--source-seeds", type=int, default=2)
+    ap.add_argument("--k", type=int, default=4)
+    ap.add_argument("--held-out", nargs="+", default=HELD_OUT)
+    ap.add_argument("--source-seeds", type=int, default=3)
+    ap.add_argument("--fewshot-seeds", type=int, default=3)
+    ap.add_argument("--pretrain-epochs", type=int, default=40)
+    ap.add_argument("--fit-epochs", type=int, default=80)
     a = ap.parse_args()
-
-    pre_ep, ft_ep, ft_lr, pre_lr = (
-        (2, 3, 1e-3, 1e-3) if a.smoke else (40, 80, 5e-4, 5e-4)
-    )
     if a.smoke:
-        a.k_values, a.source_seeds, a.held_out = [1, 2], 1, a.held_out[:1]
+        a.held_out, a.k = a.held_out[:1], 2
+        a.source_seeds = a.fewshot_seeds = 1
+        a.pretrain_epochs, a.fit_epochs = 1, 2
 
     corpus = load_corpus()
-    by_name = {d["name"]: d for d in corpus}
-    descrs = {d["name"]: d["descr"] for d in corpus}
-    held_list = [h for h in a.held_out if h in by_name]
-
-    # per-dataset train/test split + standardization (fixed across all arms)
-    splits = {}
-    for d in corpus:
-        tr, te = train_test_split(d["df"], test_size=0.3, random_state=42)
-        (Xtr, ytr), (Xte, yte), tsd = standardize(tr, te, d["feat"])
-        splits[d["name"]] = ((Xtr, ytr), (Xte, yte), tsd)
-
+    held_list = [h for h in a.held_out if h in corpus]
+    missing = sorted(set(a.held_out) - set(held_list))
     print(
-        f"device={DEV} | corpus={len(corpus)} | held_out={held_list} | "
-        f"K={a.k_values} | n_labels={a.n_labels} | source_seeds={a.source_seeds}",
+        f"corpus={len(corpus)} held_out={held_list} missing={missing} K={a.k} "
+        f"n_labels={a.n_labels} source_seeds={a.source_seeds} "
+        f"fewshot_seeds={a.fewshot_seeds}",
         flush=True,
     )
 
     results = []
     for held in held_list:
-        h = by_name[held]
-        tscale = splits[held][2]
-        pool = [d for d in corpus if d["name"] != held]
+        h = corpus[held]
+        test_df, y_test = h["test"], h["test"][TARGET]
+        pool = sorted(n for n in corpus if n != held)
+        scores = {arm: [] for arm in ("xgb", *GATED, "transfer_semantic")}
+        draws = [fewshot_rows(h, a.n_labels, f) for f in range(a.fewshot_seeds)]
 
-        # K-independent baselines (few-shot only, averaged over seeds)
-        base = {"scratch_semantic": [], "xgb": []}
-        for seed in range(max(a.source_seeds, 2)):
-            emb = SemanticColumnEmbedder(descrs[held], D_MODEL)
-            sm = SharedModel(emb, [held])
-            base["scratch_semantic"].append(
-                finetune_heldout(
-                    sm, h, splits, descrs, a.n_labels, ft_ep, ft_lr, tscale, seed
-                )
-            )
-            base["xgb"].append(xgb_rmse(h, splits, a.n_labels, tscale, seed))
-        b_sem, b_xgb = np.mean(base["scratch_semantic"]), np.mean(base["xgb"])
+        for f, rows in enumerate(draws):
+            scores["xgb"].append(xgb_rmse(h, rows, f))
+            for emb in ("semantic", "index"):
+                m = SchemaTransferRegressor(embedder=emb, seed=f)
+                m.fit(table(h, rows, held), epochs=a.fit_epochs, seed=f)
+                scores[f"scratch_{emb}"].append(rmse(m.predict(test_df), y_test))
+
+        for s in range(a.source_seeds):
+            rng = np.random.RandomState(1000 * a.k + s)
+            src = [pool[i] for i in rng.choice(len(pool), size=a.k, replace=False)]
+            sources = [table(corpus[n], corpus[n]["train"], n) for n in src]
+            for emb in ("semantic", "index"):
+                base = SchemaTransferRegressor(embedder=emb, seed=s)
+                base.pretrain(sources, epochs=a.pretrain_epochs)
+                for f, rows in enumerate(draws):
+                    m = copy.deepcopy(base)
+                    m.fit(table(h, rows, held), epochs=a.fit_epochs, seed=f)
+                    scores[f"transfer_{emb}"].append(rmse(m.predict(test_df), y_test))
+            print(f"  [{held}] source seed {s}: {src}", flush=True)
+
+        row = {
+            "held_out": held,
+            **{arm: float(np.mean(v)) for arm, v in scores.items()},
+            **{f"{arm}_std": float(np.std(v)) for arm, v in scores.items()},
+            "n_fits": {arm: len(v) for arm, v in scores.items()},
+        }
+        row["beats"] = {arm: row["transfer_semantic"] < row[arm] for arm in GATED}
+        results.append(row)
+        RESULTS.parent.mkdir(parents=True, exist_ok=True)
+        RESULTS.write_text(json.dumps(results, indent=2))
         print(
-            f"\n[{held}] tscale={tscale:.3f} | "
-            f"scratch_semantic={b_sem:.3f} | xgb={b_xgb:.3f}",
+            f"[{held}] "
+            + " | ".join(
+                f"{arm} {row[arm]:.3f}+-{row[arm + '_std']:.3f}" for arm in scores
+            ),
             flush=True,
         )
 
-        for K in a.k_values:
-            if len(pool) < K:
-                continue
-            for etype in ("semantic", "index"):
-                rmses = []
-                for seed in range(a.source_seeds):
-                    rng = np.random.RandomState(1000 * K + seed)
-                    src = [
-                        pool[i] for i in rng.choice(len(pool), size=K, replace=False)
-                    ]
-                    src_descr = sorted({t for d in src for t in d["descr"]})
-                    if etype == "semantic":
-                        emb = SemanticColumnEmbedder(src_descr, D_MODEL)
-                    else:
-                        emb = IndexColumnEmbedder(src_descr, D_MODEL)
-                    model = SharedModel(emb, [d["name"] for d in src] + [held])
-                    pretrain(model, src, splits, descrs, pre_ep, pre_lr)
-                    rmses.append(
-                        finetune_heldout(
-                            model,
-                            h,
-                            splits,
-                            descrs,
-                            a.n_labels,
-                            ft_ep,
-                            ft_lr,
-                            tscale,
-                            seed,
-                        )
-                    )
-                r = float(np.mean(rmses))
-                results.append(
-                    {
-                        "held_out": held,
-                        "K": K,
-                        "arm": f"transfer_{etype}",
-                        "rmse": r,
-                        "std": float(np.std(rmses)),
-                        "n_seeds": a.source_seeds,
-                    }
-                )
-                print(
-                    f"  K={K:>2} transfer_{etype:<8} "
-                    f"RMSE {r:.3f} +- {np.std(rmses):.3f}",
-                    flush=True,
-                )
-            results.append(
-                {
-                    "held_out": held,
-                    "K": K,
-                    "arm": "scratch_semantic",
-                    "rmse": float(b_sem),
-                }
-            )
-            results.append(
-                {"held_out": held, "K": K, "arm": "xgb", "rmse": float(b_xgb)}
-            )
-            RESULTS.write_text(json.dumps(results, indent=2))  # incremental checkpoint
-
-    # ----- verdict -----
-    print("\n=== SCHEMA-SCALING SUMMARY (held-out test RMSE) ===", flush=True)
-    verdicts = []
-    for held in held_list:
-        rows = [r for r in results if r["held_out"] == held]
-        ks = sorted({r["K"] for r in rows})
-
-        def g(K, arm, rows=rows):
-            v = [r["rmse"] for r in rows if r["K"] == K and r["arm"] == arm]
-            return v[0] if v else float("nan")
-
+    print("\n=== RELEASE GATE (held-out test RMSE, lower is better) ===", flush=True)
+    header = ["held_out", "transfer_semantic", *GATED, "xgb", "pass"]
+    print(" ".join(f"{c:>18}" for c in header), flush=True)
+    n_pass = {arm: 0 for arm in GATED}
+    for r in results:
+        ok = all(r["beats"].values())
+        for arm in GATED:
+            n_pass[arm] += r["beats"][arm]
+        cells = [r["held_out"][:18]] + [
+            f"{r[c]:.3f}" for c in ("transfer_semantic", *GATED, "xgb")
+        ]
         print(
-            f"\n[{held}]  scratch_semantic={g(ks[0], 'scratch_semantic'):.3f}  "
-            f"xgb={g(ks[0], 'xgb'):.3f}",
+            " ".join(f"{c:>18}" for c in cells) + f" {'yes' if ok else 'no':>18}",
             flush=True,
         )
-        print(
-            f"  {'K':>3} {'transfer_semantic':>18} {'transfer_index':>16}", flush=True
-        )
-        for K in ks:
-            print(
-                f"  {K:>3} {g(K, 'transfer_semantic'):>18.3f} "
-                f"{g(K, 'transfer_index'):>16.3f}",
-                flush=True,
-            )
-        kmax = ks[-1]
-        slope = g(ks[0], "transfer_semantic") - g(
-            kmax, "transfer_semantic"
-        )  # >0 => improves with K
-        v1 = slope > 0
-        v2 = g(kmax, "transfer_semantic") < g(kmax, "transfer_index")
-        v3 = g(kmax, "transfer_semantic") < g(ks[0], "scratch_semantic")
-        verdicts.append((v1, v2, v3))
-        print(
-            f"  (1) improves with K: {'PASS' if v1 else 'FAIL'} (slope {slope:+.3f}) | "
-            f"(2) sem<idx @K={kmax}: {'PASS' if v2 else 'FAIL'} | "
-            f"(3) sem<scratch: {'PASS' if v3 else 'FAIL'}",
-            flush=True,
-        )
-
-    n_val = sum(1 for v in verdicts if all(v))
-    print(
-        f"\n=== VERDICT: {n_val}/{len(verdicts)} held-out datasets satisfy ALL of "
-        f"(slope>0, sem<idx, sem<scratch) ===",
-        flush=True,
+    need = math.ceil(0.8 * len(results))
+    n_all = sum(all(r["beats"].values()) for r in results)
+    n_no_scratch_idx = sum(
+        all(v for arm, v in r["beats"].items() if arm != "scratch_index")
+        for r in results
     )
     print(
-        "VALIDATED (majority)"
-        if n_val > len(verdicts) / 2
-        else "KILL/INCONCLUSIVE: column-name semantics show no scaling transfer signal",
+        "\n"
+        + " | ".join(f"beats {arm}: {n_pass[arm]}/{len(results)}" for arm in GATED)
+        + f" | beats all three: {n_all}/{len(results)} (need {need})",
         flush=True,
     )
-    print(f"\nresults -> {RESULTS}", flush=True)
+    if a.smoke:
+        verdict = "SMOKE (not a verdict)"
+    elif n_all >= need:
+        verdict = "PASS: ship trea.transfer as a feature"
+    elif n_no_scratch_idx >= need:
+        verdict = (
+            "FAIL vs scratch_index only: mechanism real, no user value; do not ship"
+        )
+    else:
+        verdict = "FAIL"
+    print(f"VERDICT: {verdict}\nresults -> {RESULTS}", flush=True)
 
 
 if __name__ == "__main__":
