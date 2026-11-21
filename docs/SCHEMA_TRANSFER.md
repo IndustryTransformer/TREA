@@ -1,7 +1,9 @@
 # Cross-schema column-name transfer (`trea.transfer`)
 
-**Status: release gate not yet run.** Treat the class as experimental until
-`scripts/schema_scaling.py` reports PASS. This page is updated with the result.
+**Status: release gate PASSED 5/5 (2026-11-21).** `transfer_semantic` beat
+`transfer_index`, `scratch_semantic` and `scratch_index` on all five held-out tables.
+XGBoost still beat it on all five (abalone about tied). See `LESSONS.md` §3i and
+`results/schema_transfer_gate.json`.
 
 `SchemaTransferRegressor` is the shipped form of the one deep-model idea that
 survived the §3 kill clause (`LESSONS.md` §3e): a model pretrained on a few
@@ -36,9 +38,9 @@ pred = model.predict(df_new_test)            # original target units
 
 | Situation | Expectation | Evidence |
 | --- | --- | --- |
-| New table, columns never seen in pretraining, ~200 labels | Better than from-scratch deep model | LESSONS §3b (5/5 held-outs) |
+| New table, columns never seen in pretraining, ~200 labels | Better than from-scratch deep model (semantic or index) | LESSONS §3i (5/5 held-outs) |
 | Same columns under new names | No gain over index identities | LESSONS §3a |
-| Beating tuned XGBoost | Usually not (lost 4/5 in §3b) | LESSONS §3b |
+| Beating tuned XGBoost | No (lost 5/5 in the release gate; abalone ≈ tie) | LESSONS §3i |
 | More than ~4 source schemas | Gains saturate by K≈2–4 | LESSONS §3b |
 
 Scope: numeric columns, regression. Categorical columns and classification are

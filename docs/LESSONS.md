@@ -389,3 +389,29 @@ two layers, dropout 0, supervised lr .0003 (MTM lr remains .0008). Independent
 three-fit ensembling remains opt-in; the evidence does not isolate smaller depth
 from the other recipe changes. See `SMALL_MODEL_DEFAULTS.md` for compatibility
 and training-budget details. Compact experiment summaries are tracked in `results/`.
+
+### 3i. Schema-transfer release gate — PASS 5/5 (2026-11-21)
+
+The kill clause's "ship on a simpler backbone" is now `trea.transfer.SchemaTransferRegressor`
+(single-row encoder pinned to the §3b config). The pre-registered release gate
+(`scripts/schema_scaling.py`: K=4, 200 labels, 3 source × 3 few-shot seeds, §3b regression
+corpus of 15 tables) adds the `scratch_index` arm §3b lacked. Held-out test RMSE:
+
+| held-out | transfer_sem | transfer_idx | scratch_sem | scratch_idx | xgb |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| california_housing | **0.803**±0.036 | 1.151 | 0.850 | 1.151 | 0.679 |
+| concrete | **9.74**±2.33 | 14.71 | 11.37±1.33 | 14.76 | 6.92 |
+| abalone | **2.463**±0.094 | 2.616 | 2.580±0.028 | 2.582 | 2.451 |
+| airfoil_self_noise | **4.229**±0.277 | 6.216 | 4.620 | 6.265 | 3.144 |
+| Bike_Sharing_Demand | **133.1**±8.1 | 162.7 | 143.2±7.2 | 162.2 | 104.9 |
+
+**Verdict: PASS** — transfer_semantic beats all three gated arms on 5/5 (needed 4).
+Ship `trea.transfer` as a feature. Honest caveats, none of which change the verdict:
+(1) **XGBoost beats it on 5/5** (abalone ≈ tie); this is a capability for unseen schemas,
+not an accuracy win over trees. (2) Several margins are within one seed std (concrete,
+abalone). (3) Index pretraining does nothing (transfer_idx ≈ scratch_idx everywhere):
+the gain is column-name semantics, not pretraining per se. (4) Source draws overlap
+across held-outs, so the five results are not independent. Note: the gate's first run
+crashed before producing numbers because the shared manifest had grown to 89 tables
+incl. classification; the pool was restricted to the §3b corpus before any result
+existed. Results: `docs/results/schema_transfer_gate.json`.
