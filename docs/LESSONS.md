@@ -380,6 +380,14 @@ gate**: corrected feature/fit-row fairness, different optimization, one label dr
 one SSL seed per arm, and a low-label adaptation-mode change. Seed variance remains
 large, and ensemble gains must not be presented as single-fit results. Freeze the
 recipe and replicate across label draws/SSL seeds before scaling pretraining.
+That replication is pre-registered in `NOX_SSL_REPLICATION.md` (5 fresh label
+draws × 3 SSL seeds, recipe frozen; runner `scripts/nox_ssl_replication.py`).
+**Run 2026-11-21: REPLICATED.** Source-only SSL beat scratch at 1/2/5% by
+−7.3% / −6.3% / −4.8% (ensemble RMSE; 4/5, 5/5, 4/5 draws; beat the random-encoder
+control everywhere). It is gone by 10%. The 5% draw CI crosses zero, and SSL-seed
+spread is as large as draw spread. The reproduction cell matched the original
+exactly. This licenses scaling real-sensor pretraining; it does not reopen the §3
+gates. Details: `NOX_SSL_REPLICATION.md`.
 The real-sensor SSL finding does not rehabilitate the unrelated synthetic
 random-function prior. Full protocol, additional controls, baseline correction,
 and verified predictions: `NOX_TEMPORAL_PRETRAINING.md`.

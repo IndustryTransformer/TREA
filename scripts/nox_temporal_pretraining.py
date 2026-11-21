@@ -44,11 +44,26 @@ ARCH = dict(
 )
 
 
-def draw_indices(historical, fraction):
-    """Nested label draws; validation is always later than supervised fit rows."""
+# Frozen tree reference preset (selected earlier; never tuned on future labels).
+XGB_PRESET = dict(
+    n_estimators=800,
+    max_depth=6,
+    learning_rate=0.03,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    n_jobs=2,
+)
+
+
+def draw_indices(historical, fraction, seed=42):
+    """Nested label draws; validation is always later than supervised fit rows.
+
+    ``seed`` picks the label draw. The original diagnostic used 42 only; the
+    replication (``scripts/nox_ssl_replication.py``) varies it.
+    """
     cut = int(len(historical) * 0.9)
     fit_pool, val_pool = historical[:cut], historical[cut:]
-    rng = np.random.RandomState(42)
+    rng = np.random.RandomState(seed)
     fit_order, val_order = rng.permutation(fit_pool), rng.permutation(val_pool)
     if fraction == 1.0:
         return fit_order, val_order
@@ -65,8 +80,8 @@ def masked_mse(prediction, target, mask):
     return (prediction[mask] - target[mask]).square().mean()
 
 
-def setup(args):
-    args.output.mkdir(parents=True, exist_ok=False)
+def write_data(output):
+    """Standardize the nine sensors and save ``data.npz``; return row index arrays."""
     frames = []
     for path in sorted((ROOT / "data/nox").glob("gt_*.csv")):
         df = pd.read_csv(path)
@@ -83,7 +98,7 @@ def setup(args):
     y = frame.nox.to_numpy(np.float32)
     assert np.isfinite(x).all() and np.isfinite(y).all()
     np.savez_compressed(
-        args.output / "data.npz",
+        output / "data.npz",
         x=x,
         y=y,
         historical=historical,
@@ -91,6 +106,12 @@ def setup(args):
         feature_mean=mu,
         feature_std=sd,
     )
+    return historical, future
+
+
+def setup(args):
+    args.output.mkdir(parents=True, exist_ok=False)
+    historical, future = write_data(args.output)
     splits = {"future": future, "historical": historical}
     counts = {}
     for fraction in FRACTIONS:
@@ -161,15 +182,23 @@ def optimizer_for(model, lr, steps):
     return opt, scheduler
 
 
-def pretrain(args, arm, x, historical, future, config):
+def pretrain(args, arm, x, historical, future, config, seed=42, stem=None):
+    """Masked-cell SSL. ``seed`` sets encoder init, masks, and batch order.
+
+    The SSL train/validation corpus split stays at seed 42 for every ``seed``,
+    so checkpoint selection always scores the same held-out rows. ``seed=42``
+    reproduces the original diagnostic exactly.
+    """
+    stem = stem or arm
     indices = historical if arm == "pre" else np.concatenate([historical, future])
     order = np.random.RandomState(42).permutation(indices)
     cut = int(len(order) * 0.9)
     train_idx, val_idx = order[:cut], order[cut:]
     xx, xv = x[train_idx], x[val_idx]
-    generator = torch.Generator().manual_seed(4242)
+    generator = torch.Generator().manual_seed(4200 + seed)
     val_mask = torch.rand(xv.shape, generator=generator) < 0.3
     masked_val = xv.masked_fill(val_mask, float("-inf"))
+    torch.manual_seed(seed)
     model = MaskedTabularEncoder(config, **ARCH)
     opt, sched = optimizer_for(model, 8e-4, args.ssl_epochs * math.ceil(len(xx) / 512))
     best, best_epoch, best_state = float("inf"), -1, None
@@ -206,21 +235,21 @@ def pretrain(args, arm, x, historical, future, config):
             best_state = copy.deepcopy(model.tabular_encoder.state_dict())
         if epoch == 0 or (epoch + 1) % 10 == 0:
             print(
-                f"SSL {arm} epoch={epoch + 1} val={score:.5f} best={best:.5f}",
+                f"SSL {stem} epoch={epoch + 1} val={score:.5f} best={best:.5f}",
                 flush=True,
             )
-    torch.save(best_state, args.output / f"encoder_{arm}.pt")
+    torch.save(best_state, args.output / f"encoder_{stem}.pt")
     np.savez_compressed(
-        args.output / f"ssl_{arm}.splits.npz",
+        args.output / f"ssl_{stem}.splits.npz",
         train=train_idx,
         val=val_idx,
         val_mask=val_mask.numpy(),
     )
     save_json(
-        args.output / f"ssl_{arm}.json",
+        args.output / f"ssl_{stem}.json",
         dict(
             arm=arm,
-            seed=42,
+            seed=seed,
             train_rows=len(train_idx),
             val_rows=len(val_idx),
             best_epoch=best_epoch,
@@ -316,15 +345,7 @@ def run_job(args):
     started = time.monotonic()
     record = dict(arm=arm, fraction=fraction, seed=seed, target_mean=mu, target_std=sd)
     if arm == "xgb":
-        model = XGBRegressor(
-            n_estimators=800,
-            max_depth=6,
-            learning_rate=0.03,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            n_jobs=2,
-            random_state=seed,
-        )
+        model = XGBRegressor(**XGB_PRESET, random_state=seed)
         model.fit(x[fit].numpy(), y[fit].numpy())
 
         def infer(xx):
